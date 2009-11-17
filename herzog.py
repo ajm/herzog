@@ -104,6 +104,11 @@ def simwalk_wrapper(id, jobs, job_lock) :
 		dir_tuple = jobs.pop()
 		job_lock.release()
 
+		chrdir,tmpdir = dir_tuple
+		if os.path.exists("%s/SCORE-%s_%d.ALL" % (chrdir, chrdir[1:], int(tmpdir))) :
+			dbg("[simwalk_wrapper] skipping SCORE-%s_%d.ALL, results file exists..." % (chrdir[1:], int(tmpdir)))
+			continue
+
 		dbg("[simwalk_wrapper] thread %d starting simwalk" % id)
 		simwalk(dir_tuple,id)
 
