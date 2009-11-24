@@ -1,0 +1,75 @@
+
+
+commands:
+---------
+
+	action.py <directory> <program>
+	list.py
+	progress.py [project]
+	schedule.py (eg: fair scheduling or finish a project asap)
+	
+	    |
+	    |
+	    |
+	    |
+daemons:    |
+--------    V
+
+	herzog.py  --------------->  kinski.py (@pythagoras)
+	(@euclid)	|
+			|--------->  kinski.py (@leibniz)
+			|
+			|--------->  kinski.py (@newton)
+			|
+			---------->  kinski.py (@euclid)
+
+
+state machine:
+--------------
+
+needs one so it is easier to write it event driven
+
+api:
+----
+
+	herzog
+
+		(for commands)
+
+		bool 		    project_add(project_name, dir, program) // can we infer program?
+		bool		    project_remove(project_name)			// needs to kill fragments as well...
+		list_of_tuples 	project_progress([project name]) 		// use for list as well, tuples are ('project', float)
+		bool		    project_schedule(policy)			    // policy = "fair" or "project name"
+		list_of_tuples  project_active()				        // each fragment running, what machine? project? chromosome? fragment number?
+
+		(for kinski)		
+
+		bool 		    fragment_complete(???)				    // time taken, max ram usage? 
+		bool		    resources_register()					// so when kinski starts, rpc to herzog to state what is available
+
+	kinski
+		(for herzog)
+
+		bool 		    fragment_start(filepath,program)        // args in a list
+		bool		    fragment_stop(???)			            // args in a list
+		list_of_tuples	fragment_list()				            // return list of length 8?
+
+		bool 		    resources_list()			            // # cpus, cpu speed, ram, disk space, 
+
+
+problems:
+---------
+
+kinski crashes:
+	- herzog needs a watchdog timer ~1hr to each host
+	- fragment added back to the queue
+	- or at the end of a project, those fragments are rerun
+herzog crashes:
+	- needs to figure out what was running (projects)
+		- preferably without re-progressing the input + what is the input?
+
+notes:
+------
+
+use an actual logging framework, debug/error/info etc
+
