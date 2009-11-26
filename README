@@ -50,6 +50,7 @@ api:
 	kinski
 		(for herzog)
 
+        bool            fragment_prep                           // ensure everything is ready for scp of files, etc
 		bool 		    fragment_start(filepath,program)        // args in a list
 		bool		    fragment_stop(???)			            // args in a list
 		list_of_tuples	fragment_list()				            // return list of length 8?
