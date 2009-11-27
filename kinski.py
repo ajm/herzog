@@ -19,6 +19,12 @@ import plugins
 
 options = {}
 
+# 'borg pattern' by Alex Martelli @ google
+class SharedConfig:
+    __shared_state = {}
+    def __init__(self):
+        self.__dict__ = self.__shared_state
+
 class WorkerThread(threading.Thread) :
     def __init__(self, kinski, fragmentkey, pluginobj, path) :
         threading.Thread.__init__(self)
