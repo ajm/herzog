@@ -1,4 +1,4 @@
-import sys
+import sys, os
 
 class KinskiPlugin(object):
     def inspect_input_files(self, path) :
@@ -8,6 +8,9 @@ class KinskiPlugin(object):
         raise NotImplemented
 
     def run(self, path) :
+        raise NotImplemented
+
+    def kill(self) :
         raise NotImplemented
 
 class PluginError(Exception) :
@@ -20,6 +23,7 @@ def init_plugins(pluginpath='plugins'):
 def get_plugin(pluginname) :
     try :
         __import__(pluginname, None, None, [''])
+
     except ImportError :
         raise PluginError("%s does not exist" % pluginname)
 
@@ -29,3 +33,13 @@ def get_plugin(pluginname) :
 
     # could this ever happen?
     raise PluginError("%s does not seem to exist despite successful import" % pluginname)
+
+def plugin_helper_missing_files(path, files) :
+    missing = []
+
+    for f in files :
+        if not os.path.exists(path + "/" + f) :
+            missing.append(f)
+
+    return missing
+
