@@ -77,7 +77,7 @@ class Fragment :
         # to hold the temp input + output files
         while True :
             randomdir = ''.join(map(lambda x : chars[int(random.random() * len(chars))], range(8)))
-            randomdir = self.projectdirectory + "/" + randomdir
+            randomdir = self.projectdirectory + os.sep + randomdir
             if not os.path.exists(randomdir) :
                 try :
                     os.mkdir(randomdir)
@@ -182,10 +182,10 @@ class Kinski :
 
     @log_functioncall
     def fragment_prep(self, project) :
-        if project.count('/') != 0 :
-            return (False, "%s is not a suitable project name because it contains '/'")
+        if False in map(lambda x : x in chars, project)
+            return (False, "%s is not a suitable project name, please limit to %s" % chars)
 
-        projectdirectory = self.workingdir + "/" + project
+        projectdirectory = self.workingdir + os.sep + project
 
         try :
             f = Fragment(projectdirectory)
@@ -336,5 +336,7 @@ def main() :
         sys.exit()
 
 if __name__ == '__main__' :
+    if os.name != 'posix' :
+        print >> sys.stderr, "%s is only supported on posix systems at the moment"
     main()
 

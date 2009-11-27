@@ -24,7 +24,7 @@ class simwalk2(KinskiPlugin) :
 
         os.system("cd %s ; simwalk2 &> /dev/null ; cd - &> /dev/null" % (path))
         
-        score_files = filter(lambda x : os.path.basename(x).startswith("SCORE"), glob.glob(path + "/*"))
+        score_files = filter(lambda x : os.path.basename(x).startswith("SCORE"), glob.glob(path + os.sep + "*"))
         
         if len(score_files) == 0 :
             raise PluginError("no results file")

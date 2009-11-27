@@ -1,9 +1,10 @@
 import logging
 import logging.handlers
+import os
 
 def get_logger(loggername, logdirname, logfilename, verbose=False) :
 
-    logname = "%s/%s" % (logdirname, logfilename)
+    logname = "%s%s%s" % (logdirname, os.sep, logfilename)
 
     log = logging.getLogger(loggername)
     log.setLevel(logging.DEBUG)

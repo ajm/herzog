@@ -38,7 +38,7 @@ def plugin_helper_missing_files(path, files) :
     missing = []
 
     for f in files :
-        if not os.path.exists(path + "/" + f) :
+        if not os.path.exists(path + os.sep + f) :
             missing.append(f)
 
     return missing
