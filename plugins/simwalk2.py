@@ -6,23 +6,21 @@ from plugins import KinskiPlugin, PluginError
 
 class simwalk2(KinskiPlugin) :
     def __init__(self) :
-        self.log = utils.get_logger('simwalk2_plugin', '.', herzogdefaults.KINSKI_LOG_FILENAME, verbose=True)
+        pass
 
     def inspect_input_files(self, path) :
         files   = ['PEDIGREE.DAT','LOCUS.DAT','PEN.DAT','BATCH2.DAT','MAP.DAT']
         missing = plugins.plugin_helper_missing_files(path, files)
 
         if len(missing) != 0 :
-            self.log.debug("simwalk2 files missing %s" % ','.join(missing))
             raise PluginError("input files missing: %s" % ','.join(missing))
 
     def inspect_system(self, resources) :
         pass
 
     def run(self, path) :
-        self.log.debug("run start")
 
-        os.system("cd %s ; simwalk2 &> /dev/null ; cd - &> /dev/null" % (path))
+        os.system("cd %s ; simwalk2 ; cd - > /dev/null" % (path))
         
         score_files = filter(lambda x : os.path.basename(x).startswith("SCORE"), glob.glob(path + os.sep + "*"))
         

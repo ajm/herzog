@@ -40,16 +40,18 @@ class Fragment :
             if not os.path.exists(randomdir) :
                 try :
                     os.mkdir(randomdir)
-
+                    os.chmod(randomdir, 0777)
+                    
                 except OSError, ose :
-                    raise FragmentInitialisationError(str(ose))
+                    raise FragmentError(str(ose))
+
                 break
 
         return randomdir
 
-    def key(self, path, program) :
-        return (path, program)
+    def key(self) :
+        return (self.projectdirectory, self.program)
 
     def __str__(self):
-        return self.program + " @ " + self.tmpdir
+        return self.program + " @ " + self.projectdirectory
 

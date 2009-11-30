@@ -14,6 +14,7 @@ from sysinfo import Resource
 from shared import SharedConfig
 from fragment import Fragment
 import herzogdefaults
+import fragment
 import plugins
 import utils
 
@@ -35,11 +36,11 @@ class WorkerThread(threading.Thread) :
         threading.Thread.__init__(self)
 
     def kill(self) :
-        self.fragment.plugin_kill()
+        self.fragment.kill_plugin()
 
     def run(self) :
         try :
-            results = self.fragment.plugin_run()
+            results = self.fragment.run_plugin()
             self.hook(self.fragment, True, results)
 
         except plugins.PluginError, pe :
@@ -93,7 +94,7 @@ class Kinski :
         return fragmentkey in self.workers
 
     def __startfragment(self, fragment) :
-        wt = WorkerThread(self, fragment, self.fragment_done)
+        wt = WorkerThread(fragment, self.fragment_done)
         wt.start()
 
         self.workers[ fragment.key() ] = wt
@@ -123,8 +124,10 @@ class Kinski :
 
     @log_functioncall
     def fragment_prep(self, project) :
-        if False in map(lambda x : x in chars, project)
-            return (False, "%s is not a suitable project name, please limit to %s" % chars)
+        chars = string.letters + string.digits + '-'
+
+        if False in map(lambda x : x in chars, project) :
+            return (False, "%s is not a suitable project name, please limit to the following characters: %s" % (project, chars))
 
         projectdirectory = self.workingdir + os.sep + project
 
