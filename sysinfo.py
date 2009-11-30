@@ -1,6 +1,6 @@
 import socket, commands, os
 
-class resource :
+class Resource :
     def __init__(self):
         if os.name != 'posix' :
             raise NotImplemented

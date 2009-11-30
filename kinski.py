@@ -1,54 +1,24 @@
 #!/usr/bin/env python
-import sys, getopt, threading, os, string, random
-import logging, logging.handlers
-from SimpleXMLRPCServer import SimpleXMLRPCServer
+import sys
+import os
+import getopt
+import threading
+import string
+import random
+import logging
+import logging.handlers
 import xmlrpclib
+from SimpleXMLRPCServer import SimpleXMLRPCServer
 
-from sysinfo import resource
+from sysinfo import Resource
+from shared import SharedConfig
+from fragment import Fragment
 import herzogdefaults
-import utils
 import plugins
+import utils
 
-###
-# Questions:
-#   how is each thread going to log, does it need to instantiate the same logger? pass it? - probably not thread safe...
-#   how am i going to use FragmentTokens? just as keys with kinski to access worker threads? should they be passed to kinski from kerzog?
-#   does the plugin stuff work if the daemon is started from an init script? - i only used a relative path
-#   
-###
 
 options = {}
-
-# 'borg pattern' by Alex Martelli @ google
-class SharedConfig:
-    __shared_state = {}
-    def __init__(self):
-        self.__dict__ = self.__shared_state
-
-class WorkerThread(threading.Thread) :
-    def __init__(self, kinski, fragmentkey, pluginobj, path) :
-        threading.Thread.__init__(self)
-        self.log = utils.get_logger('workerthread', '.', herzogdefaults.KINSKI_LOG_FILENAME, verbose=True)
-        self.program = pluginobj
-        self.path = path
-        self.fk = fragmentkey
-        self.kinski = kinski
-
-    def kill(self) :
-        self.program.kill()
-
-    def run(self) :
-        self.log.debug("thread running %s @ %s" % (self.fk.program, self.fk.path))
-        resultsfile = ''
-        success = True
-        try :
-            resultsfile = self.program.run(self.path)
-
-        except plugins.PluginError, pe :
-            self.log.debug(str(pe))
-            success = False
-
-        self.kinski.fragment_done(self.fk, success, resultsfile)
 
 
 class KinskiError(Exception) :
@@ -57,59 +27,23 @@ class KinskiError(Exception) :
 class KinskiInitialisationError(Exception) :
     pass
 
-class FragmentInitialisationError(Exception) :
-    pass
+class WorkerThread(threading.Thread) :
+    def __init__(self, fragment, done_hook) :
+        self.fragment = fragment
+        self.hook = done_hook
 
+        threading.Thread.__init__(self)
 
-class Fragment :
-    def __init__(self,path):
-        self.projectdirectory   = path
-        self.__makesubdir()
+    def kill(self) :
+        self.fragment.plugin_kill()
 
-    def getfragmentdirectory(self) :
-        return self.fragmentdir
-
-    def __makesubdir(self) :
-        # ensure the project directory exists...
+    def run(self) :
         try :
-            if not os.path.isdir(self.projectdirectory) :
-                os.mkdir(self.projectdirectory)
-        except OSError, ose :
-            raise FragmentInitialisationError(str(ose))
+            results = self.fragment.plugin_run()
+            self.hook(self.fragment, True, results)
 
-        chars = string.letters + string.digits
-
-        # create a directory with a randomly generated name
-        # to hold the temp input + output files
-        while True :
-            randomdir = ''.join(map(lambda x : chars[int(random.random() * len(chars))], range(8)))
-            randomdir = self.projectdirectory + os.sep + randomdir
-            if not os.path.exists(randomdir) :
-                try :
-                    os.mkdir(randomdir)
-                except OSError, ose :
-                    raise FragmentInitialisationError(str(ose))
-                break
-
-        self.fragmentdir = randomdir
-    
-    def __str__(self):
-        return self.fragmentdir
-
-
-class FragmentKey :
-    def __init__(self, hostname, path, program) :
-        self.hostname   = hostname
-        self.path       = path
-        self.program    = program
-
-    def gettuple(self) :
-        return (self.hostname, self.path, self.program)
-
-    def __str__(self) :
-        tup = self.gettuple()
-        return "fk" + ((":%s"*len(tup)) % tup)
-
+        except plugins.PluginError, pe :
+            self.hook(self.fragment, False, str(pe))
 
 class Kinski :
     
@@ -119,7 +53,7 @@ class Kinski :
         self.__setuploggingdirectory(logdir, verbose)
         self.__setupworkingdirectory(baseworkingdir)
 
-        self.resource = resource()
+        self.resource = Resource()
         self.workers = {}
         self.masterurl = "http://%s:%d" % (masterhostname, masterportnumber)
         random.seed()
@@ -158,15 +92,16 @@ class Kinski :
     def __fragmentisrunning(self,fragmentkey) :
         return fragmentkey in self.workers
 
-    def __startfragment(self, fragmentkey, plugin, path) :
-        wt = WorkerThread(self, fragmentkey, plugin, path)
+    def __startfragment(self, fragment) :
+        wt = WorkerThread(self, fragment, self.fragment_done)
         wt.start()
 
-        self.workers[fragmentkey] = wt
+        self.workers[ fragment.key() ] = wt
 
-    def __stopfragment(self,fragmentkey) :
+    def __stopfragment(self, fragmentkey) :
         f = self.workers[fragmentkey]
         f.kill()
+
         del self.workers[fragmentkey]
 
     def __listfragments(self) :
@@ -194,8 +129,9 @@ class Kinski :
         projectdirectory = self.workingdir + os.sep + project
 
         try :
-            f = Fragment(projectdirectory)
-            return (True, f.getfragmentdirectory())
+            path = Fragment.mk_tmp_directory(projectdirectory)
+            
+            return (True, path)
 
         except FragmentInitialisationError, fie :
             return (False, str(fie))
@@ -208,19 +144,22 @@ class Kinski :
             p.inspect_input_files(path)
             p.inspect_system(self.resource)
 
+            f = Fragment(path, program, p)
+
+            self.__startfragment(f)
+
         except plugins.PluginError, pe :
             return (False, str(pe))
 
-        fk = FragmentKey(self.resource.hostname, path, program)
-
-        self.__startfragment(fk, p, path)
+        except fragment.FragmentError, fe :
+            return (False, str(fe))
         
-        return (True, fk)
+        return (True, f.key())
 
     @log_functioncall
     def fragment_stop(self, fragmentkey) :
         if self.__fragmentisrunning(fragmentkey) :
-            return self.__fragmentstop(fragmentkey)
+            return self.__stopfragment(fragmentkey)
         else :
             return (False, "not running")
             
@@ -232,17 +171,24 @@ class Kinski :
         try :
             p = xmlrpclib.ServerProxy(self.masterurl)
             p.register_resources(self.resource)
+
         except :
-            pass # TODO what is thrown?
+            self.log.critical("could not contact master node at (%s)" % self.masterurl)
+            sys.exit(-1)
 
     def go(self) :
-        #self.__signalmaster() # TODO what is the failure case, what exceptions are thrown, what should this throw?
+        #self.__signalmaster() # TODO
         self.server.serve_forever()
 
-    def fragment_done(self,fragmentkey, success, resultsfilename) : # TODO
-        self.log.debug("%s %s" % (str(fragmentkey), "success" if success else "faliure"))
-        #p = xmlrpclib.ServerProxy(self.masterurl)
-        #p.fragment_complete(...)
+    def fragment_done(self, fragment, success, result) :
+        self.log.debug("%s %s" % (str(fragment), "success" if success else "faliure"))
+        try :
+            p = xmlrpclib.ServerProxy(self.masterurl)
+            p.fragment_complete(fragment.key(), success, results)
+
+        except :
+            self.log.critical("could not contact master node at (%s)" % self.masterurl)
+            # sys.exit(-1) # TODO
 
 
 def usage() :
