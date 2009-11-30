@@ -68,9 +68,5 @@ kinski crashes:
 herzog crashes:
 	- needs to figure out what was running (projects)
 		- preferably without re-progressing the input + what is the input?
-
-notes:
-------
-
-use an actual logging framework, debug/error/info etc
+    - rpc in kinski to forensically identify what fragments completed for a given project (ie: if herzog daemon died)
 

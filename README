@@ -1,1 +1,1 @@
-Herzog is a simple cluster management framework that requires only python and an ssh server to distribute work across multiple machines. 
+Herzog is a simple cluster management framework that requires only python and an ssh server to distribute work across multiple networked machines.
