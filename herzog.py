@@ -26,7 +26,7 @@ class Herzog(DaemonBase) :
 
         url = "http://%s:%d" % (socket.gethostname(), portnumber)
         
-        self.server = SimpleXMLRPCServer(url)
+        self.server = SimpleXMLRPCServer((socket.gethostname(), portnumber))
 
         self.server.register_function(self.register_resources,  'register_resources')
         self.server.register_function(self.fragment_complete,   'fragment_complete')

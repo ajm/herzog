@@ -40,11 +40,15 @@ class DaemonBase :
     def __setupworkingdirectory(self, wd) :
         if not os.access(wd, os.F_OK | os.R_OK | os.W_OK) :
             raise DaemonInitialisationError("working directory %s does not exist or I do not have read/write permission" % wd)
+
+        if wd.startswith(".") :
+            wd = os.getcwd() + os.sep + wd
         
         workingdir = wd + os.sep + self.__class__.__name__.lower()
 
-        if os.path.exists(workingdir) and not os.access(workingdir, os.F_OK | os.R_OK | os.W_OK) :
-            raise DaemonInitialisationError("%s exists, but I do not have permission to access it" % workingdir)
+        if os.path.exists(workingdir) :
+            if not os.access(workingdir, os.F_OK | os.R_OK | os.W_OK) :
+                raise DaemonInitialisationError("%s exists, but I do not have permission to access it" % workingdir)
         else :
             try :
                 os.mkdir(workingdir)
