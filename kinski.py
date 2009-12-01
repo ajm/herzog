@@ -5,8 +5,8 @@ import getopt
 import threading
 import string
 import random
-import logging
-import logging.handlers
+#import logging
+#import logging.handlers
 import xmlrpclib
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 
@@ -16,17 +16,17 @@ from fragment import Fragment
 import herzogdefaults
 import fragment
 import plugins
-import utils
+#import utils
 
 
 options = {}
 
 
-class KinskiError(Exception) :
-    pass
-
-class KinskiInitialisationError(Exception) :
-    pass
+#class KinskiError(Exception) :
+#    pass
+#
+#class KinskiInitialisationError(Exception) :
+#    pass
 
 class WorkerThread(threading.Thread) :
     def __init__(self, fragment, done_hook) :
@@ -46,12 +46,13 @@ class WorkerThread(threading.Thread) :
         except plugins.PluginError, pe :
             self.hook(self.fragment, False, str(pe))
 
-class Kinski :
+class Kinski(BaseDaemon) :
     
-    version = '0.1'
+    version = 0.1
 
     def __init__(self, portnumber, baseworkingdir, logdir, masterhostname, masterportnumber, plugindir='plugins', verbose=False) :
-        self.__setuploggingdirectory(logdir, verbose)
+#        self.__setuploggingdirectory(logdir, verbose)
+        BaseDaemon.__init__(self, logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose)
         self.__setupworkingdirectory(baseworkingdir)
 
         self.resource = Resource()
@@ -75,18 +76,18 @@ class Kinski :
     def name(self):
         return self.__class__.__name__.lower()
 
-    def __setuploggingdirectory(self, logdir, verbose) :
-        try :
-            self.log = utils.get_logger('kinski', logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose=verbose)
-
-        except OSError, ose :
-            raise KinskiInitialisationError(str(ose))
-        except IOError, ioe :
-            raise KinskiInitialisationError(str(ioe))
+#    def __setuploggingdirectory(self, logdir, verbose) :
+#        try :
+#            self.log = utils.get_logger('kinski', logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose=verbose)
+#
+#        except OSError, ose :
+#            raise DaemonInitialisationError(str(ose))
+#        except IOError, ioe :
+#            raise DaemonInitialisationError(str(ioe))
 
     def __setupworkingdirectory(self, wd) :
         if not os.access(wd, os.F_OK | os.R_OK | os.W_OK) :
-            raise KinskiInitialisationError("working directory %s does not exist or I do not have read/write permission" % wd)
+            raise DaemonInitialisationError("working directory %s does not exist or I do not have read/write permission" % wd)
 
         self.workingdir = wd
 
@@ -108,14 +109,14 @@ class Kinski :
     def __listfragments(self) :
         return map(lambda x : x.gettuple(), self.workers.keys())
 
-    def log_functioncall(f):
-        argnames = f.func_code.co_varnames[:f.func_code.co_argcount]
-
-        def new_f(*args) :
-            args[0].log.info("%s(%s)" % (f.func_name, ', '.join('%s=%r' % entry for entry in zip(argnames[1:],args[1:]))))
-            return f(*args)
-
-        return new_f
+#    def log_functioncall(f):
+#        argnames = f.func_code.co_varnames[:f.func_code.co_argcount]
+#
+#        def new_f(*args) :
+#            args[0].log.info("%s(%s)" % (f.func_name, ', '.join('%s=%r' % entry for entry in zip(argnames[1:],args[1:]))))
+#            return f(*args)
+#
+#        return new_f
 
     @log_functioncall
     def list_resources(self) :
@@ -285,7 +286,7 @@ def main() :
                     verbose=options['verbose'])
         k.go()
 
-    except KinskiInitialisationError, ie :
+    except DaemonInitialisationError, ie :
         error_msg(str(ie))
     except KeyboardInterrupt :
         sys.exit()
@@ -293,5 +294,6 @@ def main() :
 if __name__ == '__main__' :
     if os.name != 'posix' :
         print >> sys.stderr, "%s is only supported on posix systems at the moment"
+
     main()
 
