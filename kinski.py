@@ -12,7 +12,6 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer
 
 from lib.daemonbase import *
 from lib.sysinfo    import Resource
-from lib.shared     import SharedConfig
 from lib.fragment   import Fragment, FragmentError
 from etc            import herzogdefaults
 
@@ -53,8 +52,8 @@ class Kinski(DaemonBase) :
 
     def __init__(self, portnumber, baseworkingdir, logdir, masterhostname, masterportnumber, plugindir='plugins', verbose=False) :
 #        self.__setuploggingdirectory(logdir, verbose)
-        DaemonBase.__init__(self, logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose)
-        self.__setupworkingdirectory(baseworkingdir)
+#        self.__setupworkingdirectory(baseworkingdir)
+        DaemonBase.__init__(self, baseworkingdir, logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose)
 
         self.resource = Resource()
         self.workers = {}
@@ -74,8 +73,8 @@ class Kinski(DaemonBase) :
 
         self.log.debug("initialised @ http://%s:%d" % (self.resource.hostname, portnumber))
 
-    def name(self):
-        return self.__class__.__name__.lower()
+#    def name(self):
+#        return self.__class__.__name__.lower()
 
 #    def __setuploggingdirectory(self, logdir, verbose) :
 #        try :
@@ -86,11 +85,11 @@ class Kinski(DaemonBase) :
 #        except IOError, ioe :
 #            raise DaemonInitialisationError(str(ioe))
 
-    def __setupworkingdirectory(self, wd) :
-        if not os.access(wd, os.F_OK | os.R_OK | os.W_OK) :
-            raise DaemonInitialisationError("working directory %s does not exist or I do not have read/write permission" % wd)
-
-        self.workingdir = wd
+#    def __setupworkingdirectory(self, wd) :
+#        if not os.access(wd, os.F_OK | os.R_OK | os.W_OK) :
+#            raise DaemonInitialisationError("working directory %s does not exist or I do not have read/write permission" % wd)
+#
+#        self.workingdir = wd
 
     def __fragmentisrunning(self,fragmentkey) :
         return fragmentkey in self.workers
@@ -131,7 +130,7 @@ class Kinski(DaemonBase) :
         if False in map(lambda x : x in chars, project) :
             return (False, "%s is not a suitable project name, please limit to the following characters: %s" % (project, chars))
 
-        projectdirectory = self.workingdir + os.sep + project
+        projectdirectory = self.workingdirectory + os.sep + project
 
         try :
             path = Fragment.mk_tmp_directory(projectdirectory)
@@ -214,7 +213,7 @@ def usage() :
             herzogdefaults.DEFAULT_HERZOG_PORT)
 
 def error_msg(s) :
-    print >> sys.stderr, "kinski: %s" % s
+    print >> sys.stderr, "%s: %s" % (sys.argv[0], s)
     sys.exit(-1)
 
 def handleargs() :
@@ -294,7 +293,7 @@ def main() :
 
 if __name__ == '__main__' :
     if os.name != 'posix' :
-        print >> sys.stderr, "%s is only supported on posix systems at the moment"
+        print >> sys.stderr, "kinski is only supported on posix systems at the moment"
 
     main()
 

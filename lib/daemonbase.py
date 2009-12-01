@@ -1,6 +1,7 @@
+import os
+import sys
 import logging
 import logging.handlers
-import os
 
 class DaemonError(Exception) :
     pass
@@ -19,19 +20,42 @@ def log_functioncall(f):
 
 class DaemonBase :
 
-    def __init__(self, logdirname, logfilename, verbose) :
-        self.__setup_logging(logdirname, logfilename, verbose)
+    def __init__(self, workingdir, logdirname, logfilename, verbose) :
+        try :
+            self.__setup_logging(logdirname, logfilename, verbose)
+            self.__setupworkingdirectory(workingdir)
+        except DaemonInitialisationError, die :
+            print >> sys.stderr, "Initisation error: %s" % str(die)
+            sys.exit(-1)
     
     def __setup_logging(self, logdirname, logfilename, verbose) :
         try :
-            self.log = self.get_logger(self.__class__.__name__, logdirname, logfilename)
+            self.log = self.__get_logger(self.__class__.__name__, logdirname, logfilename)
 
         except OSError, ose :
             raise DaemonInitialisationError(str(ose))
         except IOError, ioe :
             raise DaemonInitialisationError(str(ioe))
 
-    def get_logger(self, loggername, logdirname, logfilename, verbose=False) :
+    def __setupworkingdirectory(self, wd) :
+        if not os.access(wd, os.F_OK | os.R_OK | os.W_OK) :
+            raise DaemonInitialisationError("working directory %s does not exist or I do not have read/write permission" % wd)
+        
+        workingdir = wd + os.sep + self.__class__.__name__.lower()
+
+        if os.path.exists(workingdir) and not os.access(workingdir, os.F_OK | os.R_OK | os.W_OK) :
+            raise DaemonInitialisationError("%s exists, but I do not have permission to access it" % workingdir)
+        else :
+            try :
+                os.mkdir(workingdir)
+                os.chmod(workingdir, 0777)
+
+            except OSError, ose :
+                raise DaemonInitialisationError("could not create %s" % workingdir)
+
+        self.workingdirectory = workingdir
+
+    def __get_logger(self, loggername, logdirname, logfilename, verbose=False) :
 
         logname = "%s%s%s" % (logdirname, os.sep, logfilename)
 
