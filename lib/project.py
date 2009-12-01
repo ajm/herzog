@@ -1,6 +1,9 @@
 import os
 import string
 
+class ProjectError(Exception) :
+    pass
+
 class Project :
     def __init__(self, name, path) :
         self.__validate_name(name)
