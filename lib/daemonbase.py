@@ -30,7 +30,7 @@ class DaemonBase :
     
     def __setup_logging(self, logdirname, logfilename, verbose) :
         try :
-            self.log = self.__get_logger(self.__class__.__name__, logdirname, logfilename)
+            self.log = self.__get_logger(self.__class__.__name__, logdirname, logfilename, verbose)
 
         except OSError, ose :
             raise DaemonInitialisationError(str(ose))

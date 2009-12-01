@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 import os
+import socket
 import xmlrpclib
 
 from etc import herzogdefaults
@@ -38,49 +39,11 @@ def usage() :
 """ % sys.argv[0]
     sys.exit(-1)
 
-def getproxy() :
-    return xmlrpclib.ServerProxy("http://%s:%d" % (socket.gethostbyname(), herzogdefaults.DEFAULT_HERZOG_PORT))
-
-def add_project(args) : 
-    p = getproxy()
-    successful,msg = p.project_add(args[0], args[1])
-
-    if not successful :
-        print >> sys.stderr, "herzog: %s" % msg
-
-def rm_project(args) : 
-    p = getproxy()
-    successful,msg = p.project_remove(args[0])
-
-    if not successful :
-        print >> sys.stderr, "herzog: %s" % msg
-
-def pause_project(args) : 
-    p = getproxy()
-    successful,msg = p.project_pause(args[0])
-
-    if not successful :
-        print >> sys.stderr, "herzog: %s" % msg
-
-def resume_project(args) : 
-    p = getproxy()
-    successful,msg = p.project_pause(args[0])
-
-    if not successful :
-        print >> sys.stderr, "herzog: %s" % msg
-
-def progress(args) : # TODO
-    pass
-
-def estimate_end(args) : # TODO
-    pass
-
-def scheduler_policy(args) : 
-    raise NotImplemented
-
 def main() :
     if len(sys.argv) < 2 :
         usage()
+
+    p = xmlrpclib.ServerProxy("http://%s:%d" % (socket.gethostname(), herzogdefaults.DEFAULT_HERZOG_PORT))
 
     command = sys.argv[1]
     args = sys.argv[2:]
@@ -89,28 +52,35 @@ def main() :
         usage()
 
     elif command == 'add' and len(args) == 2 :
-        add_project(args)
+        foo = p.project_add
 
     elif command == 'rm' and len(args) == 1 :
-        rm_project(args)
+        foo = p.project_remove
 
     elif command == 'pause' and len(args) == 1 :
-        pause_project(args)
+        foo = p.project_pause
 
     elif command == 'resume' and len(args) == 1 :
-        resume_project(args)
+        foo = p.project_resume
 
     elif command == 'progress' and len(args) in [0,1] :
-        progress(args)
+        foo = p.project_progress
 
     elif command == 'when' and len(args) in [0,1] :
-        estimate_end(args)
+        foo = p.estimate_completion
 
     elif command == 'schedule' and len(args) == 1 :
-        scheduler_policy(args)
+        foo = p.scheduler_policy
 
     else :
         usage()
+
+
+    successful,msg = foo(args)
+
+    if not successful :
+        print >> sys.stderr, "herzog: %s" % msg
+
 
 if __name__ == '__main__' :
     main()

@@ -35,29 +35,43 @@ class Herzog(DaemonBase) :
         self.server.register_function(self.project_pause,       'project_pause')
         self.server.register_function(self.project_resume,      'project_resume')
         self.server.register_function(self.project_progress,    'project_progress')
+        self.server.register_function(self.estimate_completion, 'estimate_completion')
+        self.server.register_function(self.scheduler_policy,    'scheduler_policy')
         self.server.register_introspection_functions()
 
         self.log.debug("initialised @ %s" % url)
 
     @log_functioncall
-    def project_add(self, name, path) : 
-        pass
+    def project_add(self, args) :
+        name,path = args
+        return (True,'')
 
     @log_functioncall
-    def project_remove(self, name) : 
-        pass
+    def project_remove(self, args) : 
+        name = args[0]
+        return (True,'')
 
     @log_functioncall
-    def project_pause(self, name) :
-        pass
+    def project_pause(self, args) :
+        name = args[0]
+        return (True,'')
 
     @log_functioncall
-    def project_resume(self, name) :
-        pass
+    def project_resume(self, args) :
+        name = args[0]
+        return (True,'')
 
     @log_functioncall
-    def project_progress(self) : 
-        pass
+    def project_progress(self, args) :
+        return (True,'')
+
+    @log_functioncall
+    def estimate_completion(self, args) :
+        return (True,'')
+
+    @log_functioncall
+    def scheduler_policy(self, args) :
+        return (True,'')
 
     @log_functioncall
     def fragment_complete(self) : 
