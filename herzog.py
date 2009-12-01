@@ -5,6 +5,7 @@ import getopt
 import socket
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 
+from lib.project    import Project, ProjectError
 from lib.daemonbase import *
 from lib.sysinfo    import Resource
 from lib.scheduler  import FairScheduler
@@ -44,42 +45,92 @@ class Herzog(DaemonBase) :
     @log_functioncall
     def project_add(self, args) :
         name,path = args
+        try :
+            p = Project(name, path)
+
+        except ProjectError, pe:
+            return (False, str(pe))
+
+        # TODO 
+        # create project
+        # perform quick verification checks
+        # spawn thread to process entire genome + add to queue
+        # return from rpc
+
         return (True,'')
 
     @log_functioncall
     def project_remove(self, args) : 
         name = args[0]
+
+        # TODO
+        # find project - check it exists
+        # find fragments that are running
+        #   send rpcs to stop fragments
+        # delete project from memory - keep files though... or rename?
+
         return (True,'')
 
     @log_functioncall
     def project_pause(self, args) :
         name = args[0]
+
+        # TODO
+        # check project exists
+        # remove project from queue of eligable projects
+
         return (True,'')
 
     @log_functioncall
     def project_resume(self, args) :
         name = args[0]
+
+        # TODO
+        # check project exists
+        # add project back to queue of eligible projects
+
         return (True,'')
 
     @log_functioncall
     def project_progress(self, args) :
+
+        # TODO
+        # for each project named 
+        # find each project + return proportion complete
+        #       -- as a dict, { projectname : float }
+
         return (True,'')
 
     @log_functioncall
     def estimate_completion(self, args) :
+
+        # TODO
+        # ???
+
         return (True,'')
 
     @log_functioncall
     def scheduler_policy(self, args) :
+
+        # TODO
+        # reinstantiate self.scheduler
+        # fair scheduling or sequential
+
         return (True,'')
 
     @log_functioncall
     def fragment_complete(self) : 
         pass
+        # TODO
+        # spawn thread or put something on queue to 
+        # allow thread waiting on it to send the next fragment
 
     @log_functioncall
-    def register_resources(self) : 
+    def register_resources(self) :
         pass
+        # TODO
+        # add the object to a list of resources - 
+        # could inform the number of tokens in a semaphore
 
     def go(self) :
         self.server.serve_forever()
