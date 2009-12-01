@@ -7,6 +7,7 @@ from SimpleXMLRPCServer import SimpleXMLRPCServer
 
 from lib.daemonbase import *
 from lib.sysinfo    import Resource
+from lib.scheduler  import FairScheduler
 from etc            import herzogdefaults
 
 
@@ -20,8 +21,10 @@ class Herzog(DaemonBase) :
     def __init__(self, portnumber, baseworkingdir, logdir, verbose=False) :
         DaemonBase.__init__(self, baseworkingdir, logdir, herzogdefaults.HERZOG_LOG_FILENAME, verbose)
         self.resources = {}
+        self.projects = {}
+        self.scheduler = FairScheduler(self.projects, self.resources)
 
-        url = "http://%s:%d" % (socket.gethostbyname(), portnumber)
+        url = "http://%s:%d" % (socket.gethostname(), portnumber)
         
         self.server = SimpleXMLRPCServer(url)
 
@@ -29,17 +32,27 @@ class Herzog(DaemonBase) :
         self.server.register_function(self.fragment_complete,   'fragment_complete')
         self.server.register_function(self.project_add,         'project_add')
         self.server.register_function(self.project_remove,      'project_remove')
+        self.server.register_function(self.project_pause,       'project_pause')
+        self.server.register_function(self.project_resume,      'project_resume')
         self.server.register_function(self.project_progress,    'project_progress')
         self.server.register_introspection_functions()
 
         self.log.debug("initialised @ %s" % url)
 
     @log_functioncall
-    def project_add(self) : 
+    def project_add(self, name, path) : 
         pass
 
     @log_functioncall
-    def project_remove(self) : 
+    def project_remove(self, name) : 
+        pass
+
+    @log_functioncall
+    def project_pause(self, name) :
+        pass
+
+    @log_functioncall
+    def project_resume(self, name) :
         pass
 
     @log_functioncall
@@ -139,7 +152,7 @@ def main() :
 
 
 if __name__ == '__main__' :
-    if os.name() != 'posix' :
+    if os.name != 'posix' :
         print >> sys.stderr, "kinski is only supported on posix systems at the moment"
     main()
 

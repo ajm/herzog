@@ -25,7 +25,7 @@ class DaemonBase :
             self.__setup_logging(logdirname, logfilename, verbose)
             self.__setupworkingdirectory(workingdir)
         except DaemonInitialisationError, die :
-            print >> sys.stderr, "Initisation error: %s" % str(die)
+            print >> sys.stderr, "Initialisation error: %s" % str(die)
             sys.exit(-1)
     
     def __setup_logging(self, logdirname, logfilename, verbose) :
