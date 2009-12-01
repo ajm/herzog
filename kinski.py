@@ -1,20 +1,21 @@
 #!/usr/bin/env python
-import sys
 import os
+import sys
 import getopt
-import threading
 import string
 import random
 #import logging
 #import logging.handlers
+import threading
 import xmlrpclib
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 
-from sysinfo import Resource
-from shared import SharedConfig
-from fragment import Fragment
-import herzogdefaults
-import fragment
+from lib.daemonbase import *
+from lib.sysinfo    import Resource
+from lib.shared     import SharedConfig
+from lib.fragment   import Fragment, FragmentError
+from etc            import herzogdefaults
+
 import plugins
 #import utils
 
@@ -46,13 +47,13 @@ class WorkerThread(threading.Thread) :
         except plugins.PluginError, pe :
             self.hook(self.fragment, False, str(pe))
 
-class Kinski(BaseDaemon) :
+class Kinski(DaemonBase) :
     
     version = 0.1
 
     def __init__(self, portnumber, baseworkingdir, logdir, masterhostname, masterportnumber, plugindir='plugins', verbose=False) :
 #        self.__setuploggingdirectory(logdir, verbose)
-        BaseDaemon.__init__(self, logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose)
+        DaemonBase.__init__(self, logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose)
         self.__setupworkingdirectory(baseworkingdir)
 
         self.resource = Resource()
@@ -155,7 +156,7 @@ class Kinski(BaseDaemon) :
         except plugins.PluginError, pe :
             return (False, str(pe))
 
-        except fragment.FragmentError, fe :
+        except FragmentError, fe :
             return (False, str(fe))
         
         return (True, f.key())

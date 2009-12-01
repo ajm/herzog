@@ -8,12 +8,21 @@ class DaemonError(Exception) :
 class DaemonInitialisationError(Exception) :
     pass
 
+def log_functioncall(f):
+    argnames = f.func_code.co_varnames[:f.func_code.co_argcount]
+
+    def new_f(*args) :
+        args[0].log.info("%s(%s)" % (f.func_name, ', '.join('%s=%r' % entry for entry in zip(argnames[1:],args[1:]))))
+        return f(*args)
+
+    return new_f
+
 class DaemonBase :
 
-    def __init__(self, logdirname, logfilename) :
-        self.__setup_logging(logdirname, logfilename)
+    def __init__(self, logdirname, logfilename, verbose) :
+        self.__setup_logging(logdirname, logfilename, verbose)
     
-    def __setup_logging(self, logdirname, logfilename) :
+    def __setup_logging(self, logdirname, logfilename, verbose) :
         try :
             self.log = self.get_logger(self.__class__.__name__, logdirname, logfilename)
 
@@ -22,16 +31,7 @@ class DaemonBase :
         except IOError, ioe :
             raise DaemonInitialisationError(str(ioe))
 
-    def log_functioncall(f):
-        argnames = f.func_code.co_varnames[:f.func_code.co_argcount]
-
-        def new_f(*args) :
-            args[0].log.info("%s(%s)" % (f.func_name, ', '.join('%s=%r' % entry for entry in zip(argnames[1:],args[1:]))))
-            return f(*args)
-
-        return new_f
-        
-    def get_logger(loggername, logdirname, logfilename, verbose=False) :
+    def get_logger(self, loggername, logdirname, logfilename, verbose=False) :
 
         logname = "%s%s%s" % (logdirname, os.sep, logfilename)
 
