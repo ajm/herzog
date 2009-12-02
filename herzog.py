@@ -62,13 +62,14 @@ class Herzog(DaemonBase) :
         except ProjectError, pe:
             return (False, str(pe))
 
-        # TODO 
-        # create project
-        # perform quick verification checks
-        # spawn thread to process entire genome + add to queue
-        # return from rpc
+        t = threading.Thread(target=self.__process_project, args=(p))
+        t.start()
 
-        return (True,'')
+        return (True,'processing %d fragments' % p.number_of_fragments)
+    
+    def __process_project(self, p) :
+        p.process()
+        self.scheduler.add_project(p)
 
     @log_functioncall
     def project_remove(self, args) : 
@@ -257,6 +258,7 @@ def main() :
 
     try :
         os.wait()
+
     except KeyboardInterrupt :
         sys.exit()
 
