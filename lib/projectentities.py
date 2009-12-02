@@ -1,5 +1,6 @@
 import os
 import string
+import threading
 
 class ProjectError(Exception) :
     pass
@@ -31,4 +32,26 @@ class Project :
 
     def __str__(self) :
         return self.name
+
+class Job :
+    def __init__(self, project, path, program) :
+        self.project = project
+        self.path = path
+        self.program = program
+
+class ProjectPool :
+    def __init__(self) :
+        self.projects = {}
+
+        self.resource_semaphore = threading.Semaphore(0)
+        self.r_lock = threading.RLock()
+
+    def __len__(self) :
+        return len(self.projects)
+
+    def add_project(self, project) :
+        self.projects[project.name] = project
+
+
+
 

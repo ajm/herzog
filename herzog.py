@@ -3,17 +3,27 @@ import os
 import sys
 import getopt
 import socket
+import threading
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 
-from lib.project    import Project, ProjectError
+from lib.projectentities  import Project, ProjectError, ProjectPool, Job
+from lib.resourceentities import ResourcePool
 from lib.daemonbase import *
 from lib.sysinfo    import Resource
-from lib.scheduler  import FairScheduler
+from lib.scheduler  import FIFOScheduler
 from etc            import herzogdefaults
 
 
 options = {}
 
+# TODO :
+#
+# add periodic checks that :
+#   resources are still active, 
+#   whether things need to go back on a queue,
+#   that rpcs were returned correctly
+#
+# this can be the same code that is run from the beginning given a restart!
 
 class Herzog(DaemonBase) :
 
@@ -21,14 +31,15 @@ class Herzog(DaemonBase) :
 
     def __init__(self, portnumber, baseworkingdir, logdir, verbose=False) :
         DaemonBase.__init__(self, baseworkingdir, logdir, herzogdefaults.HERZOG_LOG_FILENAME, verbose)
-        self.resources = {}
-        self.projects = {}
-        self.scheduler = FairScheduler(self.projects, self.resources)
 
+        self.resources = ResourcePool()
+        self.projects = ProjectPool()
+        self.scheduler = FIFOScheduler(self.projects, self.resources)
+        
         url = "http://%s:%d" % (socket.gethostname(), portnumber)
         
         self.server = SimpleXMLRPCServer((socket.gethostname(), portnumber))
-
+        
         self.server.register_function(self.register_resources,  'register_resources')
         self.server.register_function(self.fragment_complete,   'fragment_complete')
         self.server.register_function(self.project_add,         'project_add')
@@ -39,7 +50,7 @@ class Herzog(DaemonBase) :
         self.server.register_function(self.estimate_completion, 'estimate_completion')
         self.server.register_function(self.scheduler_policy,    'scheduler_policy')
         self.server.register_introspection_functions()
-
+        
         self.log.debug("initialised @ %s" % url)
 
     @log_functioncall
@@ -103,37 +114,68 @@ class Herzog(DaemonBase) :
 
     @log_functioncall
     def estimate_completion(self, args) :
-
-        # TODO
-        # ???
-
-        return (True,'')
+        # TODO this would depend on the scheduler implementation
+        return (True, 'never')
 
     @log_functioncall
     def scheduler_policy(self, args) :
-
-        # TODO
-        # reinstantiate self.scheduler
-        # fair scheduling or sequential
-
-        return (True,'')
+        # TODO reinstantiate self.scheduler + pass it references to projects, resources
+        return (False, 'herzog only supports a FIFOScheduler at the moment')
 
     @log_functioncall
-    def fragment_complete(self) : 
-        pass
-        # TODO
-        # spawn thread or put something on queue to 
-        # allow thread waiting on it to send the next fragment
+    def fragment_complete(self, resource) : 
+        self.resources.add_core_resource(resource['hostname'])
+        return (True, '')
 
     @log_functioncall
-    def register_resources(self) :
-        pass
-        # TODO
-        # add the object to a list of resources - 
-        # could inform the number of tokens in a semaphore
+    def register_resources(self, resource) :
+        self.resources.add_host_resource(resource)
+        return (True, '')
 
+    def transfer_datafiles(path, hostname, tmpdir) :
+        command = "scp %s/* %s:%s" % (path, hostname, tmpdir)
+        if 0 != os.system(command) :
+            raise DaemonError("could not tx files with \"%s\"" % command)
+    
+    def get_proxy(r) :
+        return xmlrpclib.ProxyServer("http://%s:%d" % (r['hostname'], herzogdefaults.DEFAULT_KINSKI_PORT)) # TODO: put port number in resource object from kinski
+
+    def launch_job(self, resource, job) :
+        proxy = get_proxy(r)
+        project     = job.project
+        path        = job.path
+        program     = job.program
+        
+        successful,tmpdir = proxy.fragment_prep( project )
+        if not successful :
+            raise DaemonError(tmpdir)
+
+        transfer_datafiles(path, r['hostname'], tmpdir)
+
+        successful,msg = proxy.fragment_start( tmpdir, program )
+        if not successful :
+            raise DaemonError(msg)
+        
     def go(self) :
-        self.server.serve_forever()
+        self.xmlrpc_thread = threading.Thread(target=self.server.serve_forever())
+        self.scheduler_thread = threading.Thread(target=self.main_loop)
+
+        self.xmlrpc_thread.start()
+        self.scheduler_thread.start()
+
+    def main_loop(self) :
+        while True :
+            r,j = self.scheduler.get_resource_job()
+
+            try :
+                self.launch_job(r,j)
+                
+            except DaemonError, de :
+                self.log.error(str(de))
+            except xmlrpclib.Fault, fau :
+                self.log.error(str(fau))
+            except socket.gaierror, gai :
+                self.log.error(str(gai))
 
 
 def usage() :
@@ -212,6 +254,9 @@ def main() :
 
     except DaemonInitialisationError, ie :
         error_msg(str(ie))
+
+    try :
+        os.wait()
     except KeyboardInterrupt :
         sys.exit()
 

@@ -4,8 +4,6 @@ import sys
 import getopt
 import string
 import random
-#import logging
-#import logging.handlers
 import threading
 import xmlrpclib
 from SimpleXMLRPCServer import SimpleXMLRPCServer
@@ -16,17 +14,10 @@ from lib.fragment   import Fragment, FragmentError
 from etc            import herzogdefaults
 
 import plugins
-#import utils
 
 
 options = {}
 
-
-#class KinskiError(Exception) :
-#    pass
-#
-#class KinskiInitialisationError(Exception) :
-#    pass
 
 class WorkerThread(threading.Thread) :
     def __init__(self, fragment, done_hook) :
@@ -51,8 +42,6 @@ class Kinski(DaemonBase) :
     version = 0.1
 
     def __init__(self, portnumber, baseworkingdir, logdir, masterhostname, masterportnumber, plugindir='plugins', verbose=False) :
-#        self.__setuploggingdirectory(logdir, verbose)
-#        self.__setupworkingdirectory(baseworkingdir)
         DaemonBase.__init__(self, baseworkingdir, logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose)
 
         self.resource = Resource()
@@ -73,24 +62,6 @@ class Kinski(DaemonBase) :
 
         self.log.debug("initialised @ http://%s:%d" % (self.resource.hostname, portnumber))
 
-#    def name(self):
-#        return self.__class__.__name__.lower()
-
-#    def __setuploggingdirectory(self, logdir, verbose) :
-#        try :
-#            self.log = utils.get_logger('kinski', logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose=verbose)
-#
-#        except OSError, ose :
-#            raise DaemonInitialisationError(str(ose))
-#        except IOError, ioe :
-#            raise DaemonInitialisationError(str(ioe))
-
-#    def __setupworkingdirectory(self, wd) :
-#        if not os.access(wd, os.F_OK | os.R_OK | os.W_OK) :
-#            raise DaemonInitialisationError("working directory %s does not exist or I do not have read/write permission" % wd)
-#
-#        self.workingdir = wd
-
     def __fragmentisrunning(self,fragmentkey) :
         return fragmentkey in self.workers
 
@@ -108,15 +79,6 @@ class Kinski(DaemonBase) :
 
     def __listfragments(self) :
         return map(lambda x : x.gettuple(), self.workers.keys())
-
-#    def log_functioncall(f):
-#        argnames = f.func_code.co_varnames[:f.func_code.co_argcount]
-#
-#        def new_f(*args) :
-#            args[0].log.info("%s(%s)" % (f.func_name, ', '.join('%s=%r' % entry for entry in zip(argnames[1:],args[1:]))))
-#            return f(*args)
-#
-#        return new_f
 
     @log_functioncall
     def list_resources(self) :
