@@ -1,6 +1,6 @@
 import threading
 
-class ResourcePool :
+class ResourcePool : # TODO use Queues...
     def __init__(self) :
         self.resources = {}
         self.available = []
