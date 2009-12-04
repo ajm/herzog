@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import os
 import sys
+import time
+import signal
 import getopt
 import socket
 import threading
@@ -34,7 +36,7 @@ class Herzog(DaemonBase) :
 
         self.resources = ResourcePool()
         self.projects = ProjectPool()
-        self.scheduler = FIFOScheduler(self.projects, self.resources)
+        #self.scheduler = FIFOScheduler(self.projects, self.resources)
         
         url = "http://%s:%d" % (socket.gethostname(), portnumber)
         
@@ -62,24 +64,27 @@ class Herzog(DaemonBase) :
         except ProjectError, pe:
             return (False, str(pe))
 
-        t = threading.Thread(target=self.__process_project, args=(p))
-        t.start()
+        self.projects.put_project(p)
+        p.process_background()
 
-        return (True,'processing %d fragments' % p.number_of_fragments)
+        return (True,'processing %d fragments' % p.total_fragments)
     
-    def __process_project(self, p) :
-        p.process()
-        self.scheduler.add_project(p)
-
     @log_functioncall
     def project_remove(self, args) : 
         name = args[0]
 
-        # TODO
-        # find project - check it exists
-        # find fragments that are running
-        #   send rpcs to stop fragments
-        # delete project from memory - keep files though... or rename?
+        # TODO: this was originally intended to delete the project from the scheduler
+        # then send out rpcs to stop any currently running jobs
+        try :
+            p = self.projects.get_project(name)
+
+            if self.scheduler.running(name) :
+                self.scheduler.cancel_current_project()
+
+            self.projects.remove(name)
+
+        except ProjectError, pe :
+            return (False, str(pe))
 
         return (True,'')
 
@@ -87,36 +92,53 @@ class Herzog(DaemonBase) :
     def project_pause(self, args) :
         name = args[0]
 
-        # TODO
-        # check project exists
+        # TODO: check project exists
         # remove project from queue of eligable projects
 
-        return (True,'')
+        return (False,'not implemented, call \'rm\' instead')
 
     @log_functioncall
     def project_resume(self, args) :
         name = args[0]
 
-        # TODO
-        # check project exists
+        # TODO: check project exists
         # add project back to queue of eligible projects
 
-        return (True,'')
+        return (False,'not implemented, call \'add\' instead')
 
     @log_functioncall
     def project_progress(self, args) :
 
-        # TODO
-        # for each project named 
-        # find each project + return proportion complete
-        #       -- as a dict, { projectname : float }
+        tmp = {}
+        for name in args :
+            try :
+                p.self.projects.get_project(name)
+                tmp[name] = ("%d%%" % p.progress())
+                
+            except ProjectError, pe :
+                continue
 
-        return (True,'')
+        return (True, tmp)
 
     @log_functioncall
     def estimate_completion(self, args) :
         # TODO this would depend on the scheduler implementation
-        return (True, 'never')
+        # this is only for the FIFOScheduler, should move to scheduler class
+        name = args[0]
+
+        try :
+            p = self.projects.get_project(name)
+            prog = p.progress()
+
+            if prog == 0 :
+                return (False, '%s has not properly started yet' % name)
+
+            end_time = p.start_time + ((time.time() - p.start_time) * (100 / prog))
+
+        except ProjectError, pe :
+            return (False, str(pe))
+
+        return (True, time.ctime(end_time))
 
     @log_functioncall
     def scheduler_policy(self, args) :
@@ -139,7 +161,8 @@ class Herzog(DaemonBase) :
             raise DaemonError("could not tx files with \"%s\"" % command)
     
     def get_proxy(r) :
-        return xmlrpclib.ProxyServer("http://%s:%d" % (r['hostname'], herzogdefaults.DEFAULT_KINSKI_PORT)) # TODO: put port number in resource object from kinski
+        return xmlrpclib.ProxyServer("http://%s:%d" % (r['hostname'], herzogdefaults.DEFAULT_KINSKI_PORT)) 
+        # TODO: put port number in resource object from kinski
 
     def launch_job(self, resource, job) :
         proxy = get_proxy(r)
@@ -158,13 +181,21 @@ class Herzog(DaemonBase) :
             raise DaemonError(msg)
         
     def go(self) :
-        self.xmlrpc_thread = threading.Thread(target=self.server.serve_forever())
         self.scheduler_thread = threading.Thread(target=self.main_loop)
+        self.xmlrpc_thread    = threading.Thread(target=self.rpc_loop)
 
-        self.xmlrpc_thread.start()
         self.scheduler_thread.start()
+        self.xmlrpc_thread.start()
+
+    def rpc_loop(self) :
+        try :
+            self.server.serve_forever()
+        except :
+            pass
 
     def main_loop(self) :
+        self.scheduler = FIFOScheduler(self.projects, self.resources)
+
         while True :
             r,j = self.scheduler.get_resource_job()
 
@@ -257,7 +288,7 @@ def main() :
         error_msg(str(ie))
 
     try :
-        os.wait()
+        signal.pause()
 
     except KeyboardInterrupt :
         sys.exit()

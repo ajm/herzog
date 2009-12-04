@@ -1,7 +1,9 @@
 import os
 import re
 import sys
+import time
 import string
+import shutil
 import threading
 from glob import glob
 from Queue import Queue
@@ -10,19 +12,24 @@ class ProjectError(Exception) :
     pass
 
 class Project :
-    def __init__(self, name, path) :
+    def __init__(self, name, path, program) :
         self.__validate_name(name)
-        fragments = self.__validate_path(path)
+        numfragments = self.__validate_path(path)
 
         self.processed_fragments = 0
-        self.total_fragments = self.__get_number_of_fragments()
+        self.total_fragments = numfragments
 
         self.processing_complete = False
     
         self.name = name
         self.path = path
+        self.program = program
+        self.start_time = 0
 
         self.fragments = Queue()
+
+    def start(self) :
+        self.start_time = time.time()
 
     def __validate_name(self,name) :
         chars = string.letters + string.digits + '-'
@@ -34,7 +41,7 @@ class Project :
             raise ProjectError("cannot access %s" % path)
 
         dir_re   = re.compile(".*c(\d+)$")
-        listing = filter(lambda x : os.path.isdir(x) and dir_re.match(x), glob(self.path + os.sep + "*"))
+        listing = filter(lambda x : os.path.isdir(x) and dir_re.match(x), glob(path + os.sep + "*"))
 
         number_chromosomes = len(listing)
         number_fragments = 0
@@ -49,19 +56,19 @@ class Project :
         return number_fragments
 
     def write_mega2_input(self, path) :
-        abspath = path + os.path + "mega2_in.tmp"
+        abspath = path + os.sep + "mega2_in.tmp"
         try :
             f = open(abspath, 'w')
 
         except IOError, ioe:
-            raise ProjectError"could not open %s" % abspath) 
+            raise ProjectError("could not open %s" % abspath) 
 
         print >> f, "1\n00\n0\n1\n2\n0\n0\n0" # '00' is the file extention
         f.close()
 
         return abspath
 
-    def run_mega2(self, inputfile, path) :
+    def run_mega2(self, inputfile, path, chromo) :
         command = "cd %s ; mega2 < %s > /dev/null 2> /dev/null ; cd - > /dev/null 2> /dev/null" % (path, inputfile)
         os.system(command)
 #        status,out = commands.getstatusoutput(command)
@@ -69,18 +76,20 @@ class Project :
 #            print >> sys.stderr, "mega2 did not run properly : return code %d" % status
 #            sys.exit(-1)
 
+        # status from os.system is borked due to multiple commands
+        # but i need to do it that way to chdir in a thread...
         # check output file existance instead...
         missing = []
         files = {
-            'sw2_pedigree.00' : 'PEDIGREE.DAT',
-            'sw2_locus.00'    : 'LOCUS.DAT', 
-            'sw2_pen.00'      : 'PEN.DAT',
-            'sw2_batch.00'    : 'BATCH2.DAT',
-            'sw2_map.00'      : 'MAP.DAT'
+            'sw2_pedigree.%s' % chromo : 'PEDIGREE.DAT',
+            'sw2_locus.%s' % chromo    : 'LOCUS.DAT', 
+            'sw2_pen.%s' % chromo      : 'PEN.DAT',
+            'sw2_batch.%s' % chromo    : 'BATCH2.DAT',
+            'sw2_map.%s' % chromo      : 'MAP.DAT'
         }
-        for oldfilename,newfilename in files :
+        for oldfilename,newfilename in files.items() :
             if not os.path.exists(path + os.sep + oldfilename) :
-                missing.append(f)
+                missing.append(oldfilename)
             else :
                 os.rename(path + os.sep + oldfilename, path + os.sep + newfilename)
 
@@ -90,17 +99,22 @@ class Project :
     def __processing_complete(self) :
         self.processing_complete = True
 
+    def process_background(self) :
+        t = threading.Thread(target=self.process)
+        t.start()
+
     # TODO this must go into its own plugin or else in the kinski simwalk plugin...
     def process(self) :
         dir_re   = re.compile(".*c(\d+)$")
         input_re = re.compile("^datain_(\d+)\..*")
 
         listing = filter(lambda x : os.path.isdir(x) and dir_re.match(x), glob(self.path + os.sep + "*"))
-        mega2_input = self.write_mega2_input(path)
+        mega2_input = self.write_mega2_input(self.path)
 
         for dir in listing :
             chromo = dir_re.match(dir).group(1)
             inputfiles = glob(dir + os.sep + 'datain_*')
+
             for f in inputfiles :
                 dirname,filename = os.path.split(f)
                 m = input_re.match(filename)
@@ -126,30 +140,34 @@ class Project :
                 shutil.copy(dir + os.sep + ("map_%s.%s" % (fragid,chromo)),     fragdir + os.sep + "map.00")
                 
                 try :                
-                    run_mega2(mega2_input, fragdir)
+                    self.run_mega2(mega2_input, fragdir, chromo)
                 except ProjectError, pe :
-                    # TODO report!
+                    # TODO report! or log in some way
                     continue
 
                 # TODO write file with project name, chromosome, fragment id, program,
-                frag = (fragmentdir, ???) # TODO
-                fragments.put( frag )
+                self.fragments.put( fragdir )
 
         self.__processing_complete()
 
-    def next_fragment(self) : # TODO
-        return self.fragments.get()
+    def next_fragment(self) :
+        if self.processing_complete and self.fragments.empty() :
+            return None
 
-    def fragment_complete(self) : # TODO
-        self.fragments.task_done() # i don't know if there are going to be an consumer threads - (could send an email!)
+        frag = self.fragments.get()
 
-    def progress(self) : # TODO
+        return Job(self.name, frag, self.program)
+
+    def fragment_complete(self) : 
+        self.fragments.task_done() 
+        # i don't know if there are going to be an consumer threads - (could send an email!)
+
+    def progress(self) : 
 #        if not self.processing_complete :
 #            raise ProjectError("not all data has been preprocessed yet")
 
-        return self.processed_fragments / self.total_fragments
+        return (self.processed_fragments / float(self.total_fragments)) * 100.0
         
-
     def __str__(self) :
         return self.name
 
@@ -159,16 +177,35 @@ class Job :
         self.path = path
         self.program = program
 
-class ProjectPool : # TODO use Queues...
+    def __str__(self) :
+        return "%s : %s : %s" % (self.project, self.program, self.path)
+
+class ProjectPool : 
     def __init__(self) :
         self.projects = {}
-
-        self.resource_semaphore = threading.Semaphore(0)
-        self.r_lock = threading.RLock()
+        self.project_queue = Queue()
 
     def __len__(self) :
         return len(self.projects)
 
-    def add_project(self, project) :
+    def next_project(self) :
+        p = self.project_queue.get()
+        p.start()
+        return p
+
+    def cleanup(self,name) :
+        del self.projects[name]
+
+    def put_project(self, project) :
         self.projects[project.name] = project
+        self.project_queue.put(project)
+    
+    def get_project(self, name) :
+        try :
+            return self.projects[name]
+        except KeyError, ke :
+            raise ProjectError("%s is not an active project" % name)
+
+    def get_project_names(self) :
+        return self.projects.keys()
 
