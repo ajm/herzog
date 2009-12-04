@@ -5,6 +5,7 @@ import time
 import signal
 import getopt
 import socket
+import xmlrpclib
 import threading
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 
@@ -58,6 +59,10 @@ class Herzog(DaemonBase) :
     @log_functioncall
     def project_add(self, args) :
         name,path,program = args
+
+        if self.projects.exists(name) :
+            return (False, "a project called %s already exists" % name)
+
         try :
             p = Project(name, path, program)
 
@@ -66,7 +71,9 @@ class Herzog(DaemonBase) :
 
         self.projects.put_project(p)
         p.process_background()
-
+        
+        self.log.debug("\t%s (%d fragments) running %s from %s" % (name, p.total_fragments, program, path))
+        
         return (True,'processing %d fragments' % p.total_fragments)
     
     @log_functioncall
@@ -85,6 +92,8 @@ class Herzog(DaemonBase) :
 
         except ProjectError, pe :
             return (False, str(pe))
+
+        self.log.debug("\tstopped running %s" % name)
 
         return (True,'')
 
@@ -121,6 +130,8 @@ class Herzog(DaemonBase) :
                 p = self.projects.get_project(name)
                 state,progress = p.progress()
                 tmp[name] = (state, "%.2f%%" % progress)
+
+                self.log.debug("\t%s %s %s" % (name, tmp[name][0], tmp[name][1]))
                 
             except ProjectError, pe :
                 continue
@@ -135,17 +146,22 @@ class Herzog(DaemonBase) :
 
         try :
             p = self.projects.get_project(name)
-            prog = p.progress()
+            state,prog = p.progress()
+
+            if state != 'running' :
+                return (False, 'project \'%s\' has not properly started yet' % name)
 
             if prog == 0 :
                 return (False, 'project \'%s\' has not properly started yet' % name)
-
 
             end_time = p.start_time + ((time.time() - p.start_time) * (100 / prog))
 
         except ProjectError, pe :
             return (False, str(pe))
 
+        end = time.ctime(end_time)
+
+        self.log.debug("\t%s finish @ %s" % (name, end))
         return (True, time.ctime(end_time))
 
     @log_functioncall
@@ -154,28 +170,34 @@ class Herzog(DaemonBase) :
         return (False, 'herzog only supports a FIFOScheduler at the moment')
 
     @log_functioncall
-    def fragment_complete(self, resource) : 
-        # TODO: this needs to include the project name so Project.fragment_complete can be called
+    def fragment_complete(self, resource, project) :
         self.resources.add_core_resource(resource['hostname'])
+        p = self.projects.get_project(project)
+        p.fragment_complete()
 
         return (True, '')
-
+    
     @log_functioncall
     def register_resources(self, resource) :
         self.resources.add_host_resource(resource)
-        return (True, '')
 
-    def transfer_datafiles(path, hostname, tmpdir) :
-        command = "scp %s/* %s:%s" % (path, hostname, tmpdir)
+        self.log.debug("\tresource added")
+        for k,v in resource.items() :
+            self.log.debug("%20s  %s" % (str(k), str(v)))
+
+        return (True, '')
+    
+    def transfer_datafiles(self, path, hostname, tmpdir) :
+        command = "scp %s/*DAT %s:%s" % (path, hostname, tmpdir)
         if 0 != os.system(command) :
             raise DaemonError("could not tx files with \"%s\"" % command)
     
-    def get_proxy(r) :
-        return xmlrpclib.ProxyServer("http://%s:%d" % (r['hostname'], herzogdefaults.DEFAULT_KINSKI_PORT)) 
+    def get_proxy(self,r) :
+        return xmlrpclib.ServerProxy("http://%s:%d" % (r['hostname'], herzogdefaults.DEFAULT_KINSKI_PORT)) 
         # TODO: put port number in resource object from kinski
 
     def launch_job(self, resource, job) :
-        proxy = get_proxy(r)
+        proxy       = self.get_proxy(resource)
         project     = job.project
         path        = job.path
         program     = job.program
@@ -184,9 +206,9 @@ class Herzog(DaemonBase) :
         if not successful :
             raise DaemonError(tmpdir)
 
-        transfer_datafiles(path, r['hostname'], tmpdir)
+        self.transfer_datafiles(path, resource['hostname'], tmpdir)
 
-        successful,msg = proxy.fragment_start( tmpdir, program )
+        successful,msg = proxy.fragment_start( tmpdir, program, project )
         if not successful :
             raise DaemonError(msg)
         
@@ -210,6 +232,7 @@ class Herzog(DaemonBase) :
             r,j = self.scheduler.get_resource_job()
 
             try :
+                self.log.debug("scheduler: %s @ %s" % (str(j), r['hostname']))
                 self.launch_job(r,j)
                 
             except DaemonError, de :

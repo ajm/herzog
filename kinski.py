@@ -103,14 +103,14 @@ class Kinski(DaemonBase) :
             return (False, str(fie))
 
     @log_functioncall
-    def fragment_start(self, path, program) :
+    def fragment_start(self, path, program, project) :
         try :
             p = plugins.get_plugin(program)
 
             p.inspect_input_files(path)
             p.inspect_system(self.resource)
 
-            f = Fragment(path, program, p)
+            f = Fragment(path, program, p, project)
 
             self.__startfragment(f)
 
@@ -143,14 +143,15 @@ class Kinski(DaemonBase) :
             sys.exit(-1)
 
     def go(self) :
-        #self.__signalmaster() # TODO
+        self.__signalmaster() # TODO
         self.server.serve_forever()
 
     def fragment_done(self, fragment, success, result) :
         self.log.debug("%s %s" % (str(fragment), "success" if success else "faliure"))
         try :
             p = xmlrpclib.ServerProxy(self.masterurl)
-            p.fragment_complete(fragment.key(), success, results)
+            #p.fragment_complete(fragment.key(), success, results)
+            p.fragment_complete(self.resource, fragment.project)
 
         except :
             self.log.critical("could not contact master node at (%s)" % self.masterurl)

@@ -18,6 +18,7 @@ class Project :
     PREPROCESSED = 2
     RUNNING = 3     # unused
     COMPLETED = 4   # unused
+    CANCELLED = 5
 
     def __init__(self, name, path, program) :
         self.__validate_name(name)
@@ -128,11 +129,19 @@ class Project :
             inputfiles = glob(dir + os.sep + 'datain_*')
 
             for f in inputfiles :
+
+                if self.state == Project.CANCELLED :
+                    return
+
                 dirname,filename = os.path.split(f)
                 m = input_re.match(filename)
                 if not m :
                     continue
                 fragid = m.group(1)
+
+                if os.path.exists(dirname + os.sep + ("SCORE-%s_%s.ALL" % (chromo, fragid))) :
+                    continue
+
                 fragdir = dirname + os.sep + fragid
                 if os.path.exists(fragdir) :
                     try :
@@ -188,6 +197,9 @@ class Project :
             return ('running',          (self.processed_fragments / float(self.total_fragments)) * 100.0)
         else :
             return ('unknown', -1.0)
+
+    def cancel(self) :
+        self.state = Project.CANCELLED
         
     def __str__(self) :
         return self.name
@@ -209,12 +221,16 @@ class ProjectPool :
     def __len__(self) :
         return len(self.projects)
 
+    def exists(self,name) :
+        return name in self.projects
+
     def next_project(self) :
         p = self.project_queue.get()
         p.start()
         return p
 
     def remove(self,name) :
+        self.projects[name].cancel()
         del self.projects[name]
 
     def cleanup(self,name) :

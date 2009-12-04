@@ -67,7 +67,7 @@ def main() :
     elif command == 'progress' and len(args) in [0,1] :
         foo = p.project_progress
 
-    elif command == 'when' and len(args) in [0,1] :
+    elif command == 'when' and len(args) == 1 :
         foo = p.estimate_completion
 
     elif command == 'schedule' and len(args) == 1 :
@@ -86,15 +86,20 @@ def main() :
     if command == 'add' :
         print msg
 
+    elif command == 'when' :
+        print msg
+
     elif command == 'progress' :
         if len(msg) > 0 :
             s = "%10s %15s %10s"
-            print s % ("project","state","progress")
-            print "-" * 37
+            if len(args) == 0 :
+                print s % ("project","state","progress")
+                print "-" * 37
             for k,v in msg.items() :
                 state,progress = v
                 print s % (k,state,progress)
-            print ""
+            if len(args) == 0 :
+                print ""
 
 
 if __name__ == '__main__' :

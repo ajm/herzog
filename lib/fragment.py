@@ -4,10 +4,11 @@ class FragmentError(Exception) :
     pass
 
 class Fragment :
-    def __init__(self, path, program, plugin):
+    def __init__(self, path, program, plugin, project):
         self.projectdirectory = path
         self.program = program
         self.plugin = plugin
+        self.project = project
 
         if not os.path.exists(self.projectdirectory) :
             raise FragmentError("%s does not exist" % self.projectdirectory)

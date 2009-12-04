@@ -1,7 +1,5 @@
 import os, glob
 import plugins
-import utils
-import herzogdefaults
 from plugins import KinskiPlugin, PluginError
 
 class simwalk2(KinskiPlugin) :

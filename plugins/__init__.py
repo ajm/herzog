@@ -17,15 +17,16 @@ class PluginError(Exception) :
     pass
 
 def init_plugins(pluginpath='plugins'):
-    if not pluginpath in sys.path :
+    p = os.path.abspath(sys.argv[0]) + os.sep + pluginpath
+    if not p in sys.path :
         sys.path.insert(0, pluginpath)
 
 def get_plugin(pluginname) :
     try :
         __import__(pluginname, None, None, [''])
 
-    except ImportError :
-        raise PluginError("%s does not exist" % pluginname)
+    except ImportError, ie :
+        raise PluginError("%s plugin does not exist (%s)" % (pluginname, str(ie)))
 
     for p in KinskiPlugin.__subclasses__() :
         if p.__name__ == pluginname :
