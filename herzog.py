@@ -57,9 +57,9 @@ class Herzog(DaemonBase) :
 
     @log_functioncall
     def project_add(self, args) :
-        name,path = args
+        name,path,program = args
         try :
-            p = Project(name, path)
+            p = Project(name, path, program)
 
         except ProjectError, pe:
             return (False, str(pe))
@@ -109,11 +109,18 @@ class Herzog(DaemonBase) :
     @log_functioncall
     def project_progress(self, args) :
 
+        if len(args) == 0 :
+            names = self.projects.get_project_names()
+        else :
+            names = args
+
         tmp = {}
-        for name in args :
+
+        for name in names :
             try :
-                p.self.projects.get_project(name)
-                tmp[name] = ("%d%%" % p.progress())
+                p = self.projects.get_project(name)
+                state,progress = p.progress()
+                tmp[name] = (state, "%.2f%%" % progress)
                 
             except ProjectError, pe :
                 continue
@@ -131,7 +138,8 @@ class Herzog(DaemonBase) :
             prog = p.progress()
 
             if prog == 0 :
-                return (False, '%s has not properly started yet' % name)
+                return (False, 'project \'%s\' has not properly started yet' % name)
+
 
             end_time = p.start_time + ((time.time() - p.start_time) * (100 / prog))
 
@@ -147,7 +155,9 @@ class Herzog(DaemonBase) :
 
     @log_functioncall
     def fragment_complete(self, resource) : 
+        # TODO: this needs to include the project name so Project.fragment_complete can be called
         self.resources.add_core_resource(resource['hostname'])
+
         return (True, '')
 
     @log_functioncall

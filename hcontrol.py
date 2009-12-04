@@ -11,9 +11,10 @@ def usage() :
     print >> sys.stderr, \
 """Usage %s
 
-        add project_name directory_name
+        add project_name directory_name program_name
             Add a project called 'project_name' to the queue, 
-            the input files of which are contained in 'directory_name'.
+            the input files of which are contained in 'directory_name'
+            and are to be processed by 'program_name'
 
         rm  project_name
             Remove project 'project_name' from the queue.
@@ -51,7 +52,7 @@ def main() :
     if command in ['-h','help'] :
         usage()
 
-    elif command == 'add' and len(args) == 2 :
+    elif command == 'add' and len(args) == 3 :
         foo = p.project_add
 
     elif command == 'rm' and len(args) == 1 :
@@ -80,8 +81,26 @@ def main() :
 
     if not successful :
         print >> sys.stderr, "herzog: %s" % msg
+        sys.exit(-1)
+
+    if command == 'add' :
+        print msg
+
+    elif command == 'progress' :
+        if len(msg) > 0 :
+            s = "%10s %15s %10s"
+            print s % ("project","state","progress")
+            print "-" * 37
+            for k,v in msg.items() :
+                state,progress = v
+                print s % (k,state,progress)
+            print ""
 
 
 if __name__ == '__main__' :
-    main()
+    try :
+        main()
+    except socket.error :
+        print >> sys.stderr, "no daemon to communicate with"
+        sys.exit(-1)
 

@@ -34,6 +34,9 @@ class FIFOScheduler(Scheduler) :
     def get_current_project(self) :
         return self.current_project.name
 
+    def running(self, name) :
+        return name == self.current_project.name
+
     def cancel_current_project(self) :
         self.cancelled = True
 

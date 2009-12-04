@@ -12,14 +12,22 @@ class ProjectError(Exception) :
     pass
 
 class Project :
+
+    STARTED = 0
+    PREPROCESSING = 1
+    PREPROCESSED = 2
+    RUNNING = 3     # unused
+    COMPLETED = 4   # unused
+
     def __init__(self, name, path, program) :
         self.__validate_name(name)
         numfragments = self.__validate_path(path)
 
-        self.processed_fragments = 0
-        self.total_fragments = numfragments
+        self.preprocessed_fragments     = 0
+        self.processed_fragments        = 0
+        self.total_fragments            = numfragments
 
-        self.processing_complete = False
+#        self.processing_complete = False
     
         self.name = name
         self.path = path
@@ -27,6 +35,8 @@ class Project :
         self.start_time = 0
 
         self.fragments = Queue()
+
+        self.state = Project.STARTED
 
     def start(self) :
         self.start_time = time.time()
@@ -97,9 +107,11 @@ class Project :
             raise ProjectError("%s not found after running mega2" % ','.join(missing))
 
     def __processing_complete(self) :
-        self.processing_complete = True
+        self.state = Project.PREPROCESSED
+#        self.processing_complete = True
 
     def process_background(self) :
+        self.state = Project.PREPROCESSING
         t = threading.Thread(target=self.process)
         t.start()
 
@@ -147,26 +159,35 @@ class Project :
 
                 # TODO write file with project name, chromosome, fragment id, program,
                 self.fragments.put( fragdir )
+                self.preprocessed_fragments += 1
 
         self.__processing_complete()
 
     def next_fragment(self) :
-        if self.processing_complete and self.fragments.empty() :
+#        if self.processing_complete and self.fragments.empty() :
+        if self.state == Project.PREPROCESSED and self.fragments.empty() :
             return None
 
         frag = self.fragments.get()
 
         return Job(self.name, frag, self.program)
 
-    def fragment_complete(self) : 
+    def finished(self) :
+        return self.processed_fragments == self.total_fragments
+
+    def fragment_complete(self) :
+        self.processed_fragments += 1
         self.fragments.task_done() 
         # i don't know if there are going to be an consumer threads - (could send an email!)
 
     def progress(self) : 
-#        if not self.processing_complete :
-#            raise ProjectError("not all data has been preprocessed yet")
-
-        return (self.processed_fragments / float(self.total_fragments)) * 100.0
+#        return (self.processed_fragments / float(self.total_fragments)) * 100.0
+        if self.state == Project.PREPROCESSING :
+            return ('preprocessing',    (self.preprocessed_fragments / float(self.total_fragments)) * 100.0)
+        elif self.state == Project.PREPROCESSED :
+            return ('running',          (self.processed_fragments / float(self.total_fragments)) * 100.0)
+        else :
+            return ('unknown', -1.0)
         
     def __str__(self) :
         return self.name
@@ -193,8 +214,11 @@ class ProjectPool :
         p.start()
         return p
 
-    def cleanup(self,name) :
+    def remove(self,name) :
         del self.projects[name]
+
+    def cleanup(self,name) :
+        self.remove(name)
 
     def put_project(self, project) :
         self.projects[project.name] = project
