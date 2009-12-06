@@ -170,9 +170,16 @@ class Herzog(DaemonBase) :
         return (False, 'herzog only supports a FIFOScheduler at the moment')
 
     @log_functioncall
-    def fragment_complete(self, resource, project) :
+    def fragment_complete(self, resource, project, path) :
         self.resources.add_core_resource(resource['hostname'])
         p = self.projects.get_project(project)
+
+        # get the results file, 
+        # I need get the SCORE file from path,
+        # path needs to resolve from remotepath -> localpath/SCORE-XX_YYY.ALL
+        localpath = p.mapping_get( remotepath )
+        self.get_resultfile(resource['hostname'], path, localpath)
+        
         p.fragment_complete()
 
         return (True, '')
@@ -187,11 +194,16 @@ class Herzog(DaemonBase) :
 
         return (True, '')
     
-    def transfer_datafiles(self, path, hostname, tmpdir) :
-        command = "scp %s/*DAT %s:%s" % (path, hostname, tmpdir)
+    def transfer_datafiles(self, hostname, remotepath, localpath) :
+        command = "scp %s/*DAT %s:%s" % (localpath, hostname, remotepath)
         if 0 != os.system(command) :
             raise DaemonError("could not tx files with \"%s\"" % command)
     
+    def get_resultfile(self, hostname, remotepath, localpath) :
+        command = "scp %s:%s/SCORE-01.ALL %s" % (hostname, remotepath, localpath)
+        if 0 != os.system(command) :
+            raise DaemonError("could retrieve results file with \"%s\"" % command)
+
     def get_proxy(self,r) :
         return xmlrpclib.ServerProxy("http://%s:%d" % (r['hostname'], herzogdefaults.DEFAULT_KINSKI_PORT)) 
         # TODO: put port number in resource object from kinski

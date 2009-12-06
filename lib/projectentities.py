@@ -13,12 +13,12 @@ class ProjectError(Exception) :
 
 class Project :
 
-    STARTED = 0
-    PREPROCESSING = 1
-    PREPROCESSED = 2
-    RUNNING = 3     # unused
-    COMPLETED = 4   # unused
-    CANCELLED = 5
+    STARTED         = 0
+    PREPROCESSING   = 1
+    READY           = 2
+    RUNNING         = 3     
+    COMPLETED       = 4
+    CANCELLED       = 5
 
     def __init__(self, name, path, program) :
         self.__validate_name(name)
@@ -34,6 +34,7 @@ class Project :
         self.path = path
         self.program = program
         self.start_time = 0
+        self.map = {}
 
         self.fragments = Queue()
 
@@ -41,6 +42,8 @@ class Project :
 
     def start(self) :
         self.start_time = time.time()
+        if self.preprocessed_fragments == self.total_fragments :
+            self.state = Project.RUNNING
 
     def __validate_name(self,name) :
         chars = string.letters + string.digits + '-'
@@ -108,7 +111,10 @@ class Project :
             raise ProjectError("%s not found after running mega2" % ','.join(missing))
 
     def __processing_complete(self) :
-        self.state = Project.PREPROCESSED
+        if self.processed_fragments == 0 :
+            self.state = Project.READY
+        else :
+            self.state = Project.RUNNING
 #        self.processing_complete = True
 
     def process_background(self) :
@@ -166,18 +172,36 @@ class Project :
                     # TODO report! or log in some way
                     continue
 
+                self.write_summary(fragdir, self.project, chromo, fragid) # TODO: is this cool?
+
+                tmp = (fragdir, dir + os.sep + ("SCORE-%s_%s.ALL" % (chromo,fragid)))
                 # TODO write file with project name, chromosome, fragment id, program,
-                self.fragments.put( fragdir )
+                self.fragments.put( tmp )
                 self.preprocessed_fragments += 1
 
         self.__processing_complete()
+
+    def write_summary(self, fragdir, project, chromosome, fragment) :
+        f = open(fragdir + os.sep + "SUMMARY.DAT", 'w')
+        print >> f, "%s %s %s" % (project, chromosome, fragment)
+        f.close()
+
+    def mapping_put(self, x, y) :
+        self.map[x] = y
+
+    def mapping_get(self, x) :
+        tmp = self.map[x]
+        del self.map[x]
+        return tmp
 
     def next_fragment(self) :
 #        if self.processing_complete and self.fragments.empty() :
         if self.state == Project.PREPROCESSED and self.fragments.empty() :
             return None
 
-        frag = self.fragments.get()
+        fragdir,resultsfile = self.fragments.get()
+
+        self.mapping_put(fragdir, resultsfile) 
 
         return Job(self.name, frag, self.program)
 
@@ -193,8 +217,12 @@ class Project :
 #        return (self.processed_fragments / float(self.total_fragments)) * 100.0
         if self.state == Project.PREPROCESSING :
             return ('preprocessing',    (self.preprocessed_fragments / float(self.total_fragments)) * 100.0)
-        elif self.state == Project.PREPROCESSED :
+        elif self.state == Project.READY :
+            return ('ready',            0.0)
+        elif self.state == Project.RUNNING :
             return ('running',          (self.processed_fragments / float(self.total_fragments)) * 100.0)
+        elif self.state == Project.COMPLETE :
+            return ('complete',         100.0)
         else :
             return ('unknown', -1.0)
 
