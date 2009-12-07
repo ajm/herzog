@@ -61,7 +61,9 @@ class Herzog(DaemonBase) :
         name,path,program = args
 
         if self.projects.exists(name) :
-            return (False, "a project called %s already exists" % name)
+            msg = "a project called %s already exists" % name
+            self.log.info("project_add: " + msg)
+            return (False, msg)
 
         try :
             p = Project(name, path, program)
@@ -72,7 +74,7 @@ class Herzog(DaemonBase) :
         self.projects.put_project(p)
         p.process_background()
         
-        self.log.debug("\t%s (%d fragments) running %s from %s" % (name, p.total_fragments, program, path))
+        self.log.info("project_add: %s (%d fragments) running %s from %s" % (name, p.total_fragments, program, path))
         
         return (True,'processing %d fragments' % p.total_fragments)
     
@@ -91,9 +93,10 @@ class Herzog(DaemonBase) :
             self.projects.remove(name)
 
         except ProjectError, pe :
+            self.log.info("project_remove: " + str(pe))
             return (False, str(pe))
 
-        self.log.debug("\tstopped running %s" % name)
+        self.log.debug("stopped running %s" % name)
 
         return (True,'')
 
@@ -170,15 +173,17 @@ class Herzog(DaemonBase) :
         return (False, 'herzog only supports a FIFOScheduler at the moment')
 
     @log_functioncall
-    def fragment_complete(self, resource, project, path) :
+    def fragment_complete(self, resource, project, remotepath) :
         self.resources.add_core_resource(resource['hostname'])
         p = self.projects.get_project(project)
 
-        # get the results file, 
-        # I need get the SCORE file from path,
-        # path needs to resolve from remotepath -> localpath/SCORE-XX_YYY.ALL
-        localpath = p.mapping_get( remotepath )
-        self.get_resultfile(resource['hostname'], path, localpath)
+        # <hack>
+        #   get the results file, 
+        #   I need get the SCORE file from path,
+        #   path needs to resolve from remotepath -> localpath/SCORE-XX_YYY.ALL
+        localpath = p.mapping_get( os.path.dirname(remotepath) )
+        self.get_resultfile(resource['hostname'], remotepath, localpath)
+        # </hack>
         
         p.fragment_complete()
 
@@ -200,7 +205,7 @@ class Herzog(DaemonBase) :
             raise DaemonError("could not tx files with \"%s\"" % command)
     
     def get_resultfile(self, hostname, remotepath, localpath) :
-        command = "scp %s:%s/SCORE-01.ALL %s" % (hostname, remotepath, localpath)
+        command = "scp %s:%s %s" % (hostname, remotepath, localpath)
         if 0 != os.system(command) :
             raise DaemonError("could retrieve results file with \"%s\"" % command)
 
@@ -218,7 +223,15 @@ class Herzog(DaemonBase) :
         if not successful :
             raise DaemonError(tmpdir)
 
-        self.transfer_datafiles(path, resource['hostname'], tmpdir)
+        # <hack>
+        # nasty hack of a mapping between remote directory and where we want the local 
+        # results file to sit and be called...
+        p = self.projects.get_project(project)
+        p.mapping_put( tmpdir, job.resultsfile )
+        self.log.debug("*** mapping %s -> %s" % (tmpdir, job.resultsfile))
+        # </hack>
+
+        self.transfer_datafiles(resource['hostname'], tmpdir, path)
 
         successful,msg = proxy.fragment_start( tmpdir, program, project )
         if not successful :

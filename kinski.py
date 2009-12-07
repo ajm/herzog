@@ -146,15 +146,17 @@ class Kinski(DaemonBase) :
         self.__signalmaster() # TODO
         self.server.serve_forever()
 
-    def fragment_done(self, fragment, success, result) :
+    def fragment_done(self, fragment, success, resultfile) :
         self.log.debug("%s %s" % (str(fragment), "success" if success else "faliure"))
-        try :
+        self.log.debug("resultfile = %s" % resultfile)
+        #try :
+        if 1 :
             p = xmlrpclib.ServerProxy(self.masterurl)
             #p.fragment_complete(fragment.key(), success, results)
-            p.fragment_complete(self.resource, fragment.project)
+            p.fragment_complete(self.resource, fragment.project, resultfile)
 
-        except :
-            self.log.critical("could not contact master node at (%s)" % self.masterurl)
+        #except :
+        #    self.log.critical("could not contact master node at (%s)" % self.masterurl)
             # sys.exit(-1) # TODO
 
 

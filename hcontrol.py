@@ -91,12 +91,12 @@ def main() :
 
     elif command == 'progress' :
         if len(msg) > 0 :
-            s = "%10s %15s %10s"
+            s = "%20s %15s %15s"
             if len(args) == 0 :
                 print s % ("project","state","progress")
-                print "-" * 37
-            for k,v in msg.items() :
-                state,progress = v
+                print "-" * 52
+            for k in sorted(msg) :
+                state,progress = msg[k]
                 print s % (k,state,progress)
             if len(args) == 0 :
                 print ""

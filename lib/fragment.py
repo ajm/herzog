@@ -14,7 +14,7 @@ class Fragment :
             raise FragmentError("%s does not exist" % self.projectdirectory)
 
     def run_plugin(self) :
-        self.plugin.run(self.projectdirectory)
+        return self.plugin.run(self.projectdirectory)
 
     def kill_plugin(self) :
         self.plugin.kill()

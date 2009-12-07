@@ -42,13 +42,15 @@ class Project :
 
     def start(self) :
         self.start_time = time.time()
-        if self.preprocessed_fragments == self.total_fragments :
+        #if self.preprocessed_fragments == self.total_fragments :
+        #    self.state = Project.RUNNING
+        if self.state == Project.READY :
             self.state = Project.RUNNING
 
     def __validate_name(self,name) :
         chars = string.letters + string.digits + '-'
         if False in map(lambda x : x in chars, name) :
-            raise "project names must only contain the following characters: %s" % chars
+            raise ProjectError("project names must only contain the following characters: %s" % chars)
 
     def __validate_path(self, path) :
         if not os.access(path, os.F_OK | os.R_OK | os.W_OK) :
@@ -113,6 +115,8 @@ class Project :
     def __processing_complete(self) :
         if self.processed_fragments == 0 :
             self.state = Project.READY
+        elif self.processed_fragments == self.total_fragments :
+            self.state = Project.COMPLETED 
         else :
             self.state = Project.RUNNING
 #        self.processing_complete = True
@@ -146,6 +150,7 @@ class Project :
                 fragid = m.group(1)
 
                 if os.path.exists(dirname + os.sep + ("SCORE-%s_%s.ALL" % (chromo, fragid))) :
+                    self.processed_fragments += 1
                     continue
 
                 fragdir = dirname + os.sep + fragid
@@ -172,7 +177,7 @@ class Project :
                     # TODO report! or log in some way
                     continue
 
-                self.write_summary(fragdir, self.project, chromo, fragid) # TODO: is this cool?
+                self.write_summary(fragdir, self.name, chromo, fragid) # TODO: is this cool?
 
                 tmp = (fragdir, dir + os.sep + ("SCORE-%s_%s.ALL" % (chromo,fragid)))
                 # TODO write file with project name, chromosome, fragment id, program,
@@ -196,20 +201,26 @@ class Project :
 
     def next_fragment(self) :
 #        if self.processing_complete and self.fragments.empty() :
-        if self.state == Project.PREPROCESSED and self.fragments.empty() :
+        if self.state == Project.RUNNING and self.fragments.empty() :
+            return None
+
+        if self.state == Project.COMPLETED or self.state == Project.CANCELLED :
             return None
 
         fragdir,resultsfile = self.fragments.get()
 
-        self.mapping_put(fragdir, resultsfile) 
+        #self.mapping_put(fragdir, resultsfile) 
 
-        return Job(self.name, frag, self.program)
+        return Job(self.name, fragdir, self.program, resultsfile)
 
     def finished(self) :
         return self.processed_fragments == self.total_fragments
 
     def fragment_complete(self) :
         self.processed_fragments += 1
+        if self.state == Project.RUNNING and self.finished() :
+            self.state = Project.COMPLETED
+
         self.fragments.task_done() 
         # i don't know if there are going to be an consumer threads - (could send an email!)
 
@@ -221,7 +232,7 @@ class Project :
             return ('ready',            0.0)
         elif self.state == Project.RUNNING :
             return ('running',          (self.processed_fragments / float(self.total_fragments)) * 100.0)
-        elif self.state == Project.COMPLETE :
+        elif self.state == Project.COMPLETED :
             return ('complete',         100.0)
         else :
             return ('unknown', -1.0)
@@ -233,10 +244,11 @@ class Project :
         return self.name
 
 class Job :
-    def __init__(self, project, path, program) :
+    def __init__(self, project, path, program, resultsfile) :
         self.project = project
         self.path = path
         self.program = program
+        self.resultsfile = resultsfile
 
     def __str__(self) :
         return "%s : %s : %s" % (self.project, self.program, self.path)

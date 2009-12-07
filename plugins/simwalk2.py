@@ -25,7 +25,7 @@ class simwalk2(KinskiPlugin) :
         if len(score_files) == 0 :
             raise PluginError("no results file")
         elif len(score_files) == 1 :
-            return path + os.sep + score_files[0]
+            return score_files[0]
         else :
             raise PluginError("ambiguous results file, found %s" % ','.join(score_files))
 
