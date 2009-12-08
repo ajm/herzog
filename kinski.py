@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import sys
+import time
 import getopt
 import string
 import random
@@ -48,6 +49,8 @@ class Kinski(DaemonBase) :
         self.workers = {}
         self.masterurl = "http://%s:%d" % (masterhostname, masterportnumber)
         random.seed()
+
+        self.resource.portnumber = portnumber # <hack>
 
         plugins.init_plugins(plugindir)
         
@@ -133,13 +136,24 @@ class Kinski(DaemonBase) :
     def fragment_list(self) :
         return self.__listfragments()
 
+    def poll_for_master(self) :
+        p = xmlrpclib.ServerProxy(self.masterurl)
+        while True :
+            try :
+                p.register_resources(self.resource)
+                break
+            except :
+                pass
+
+            time.sleep(60)
+
     def __signalmaster(self) :
         try :
             p = xmlrpclib.ServerProxy(self.masterurl)
             p.register_resources(self.resource)
 
         except :
-            self.log.critical("could not contact master node at (%s)" % self.masterurl)
+            self.log.critical("could not contact master node at %s" % self.masterurl)
             sys.exit(-1)
 
     def go(self) :
@@ -149,15 +163,13 @@ class Kinski(DaemonBase) :
     def fragment_done(self, fragment, success, resultfile) :
         self.log.debug("%s %s" % (str(fragment), "success" if success else "faliure"))
         self.log.debug("resultfile = %s" % resultfile)
-        #try :
-        if 1 :
+        try :
             p = xmlrpclib.ServerProxy(self.masterurl)
-            #p.fragment_complete(fragment.key(), success, results)
             p.fragment_complete(self.resource, fragment.project, resultfile)
 
-        #except :
-        #    self.log.critical("could not contact master node at (%s)" % self.masterurl)
-            # sys.exit(-1) # TODO
+        except :
+            self.log.critical("could not contact master node at %s (%s)" % (self.masterurl, resultfile))
+            # TODO call poll_for_master in separate thread...
 
 
 def usage() :

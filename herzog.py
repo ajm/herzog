@@ -53,6 +53,8 @@ class Herzog(DaemonBase) :
         self.server.register_function(self.estimate_completion, 'estimate_completion')
         self.server.register_function(self.scheduler_policy,    'scheduler_policy')
         self.server.register_introspection_functions()
+
+        self.server.register_function(self.list_current,    'list_current')
         
         self.log.debug("initialised @ %s" % url)
 
@@ -69,6 +71,7 @@ class Herzog(DaemonBase) :
             p = Project(name, path, program)
 
         except ProjectError, pe:
+            self.log.info(str(pe))
             return (False, str(pe))
 
         self.projects.put_project(p)
@@ -96,27 +99,39 @@ class Herzog(DaemonBase) :
             self.log.info("project_remove: " + str(pe))
             return (False, str(pe))
 
-        self.log.debug("stopped running %s" % name)
+        self.log.debug("deleted %s project" % name)
 
-        return (True,'')
+        return (True,'removed %s' % name)
 
     @log_functioncall
     def project_pause(self, args) :
         name = args[0]
 
-        # TODO: check project exists
-        # remove project from queue of eligable projects
+        try :
+            self.projects.pause(name)
 
-        return (False,'not implemented, call \'rm\' instead')
+        except ProjectError, pe :
+            self.log.info("project_pause: " + str(pe))
+            return (False, str(pe))
+
+        self.log.debug("paused %s" % name)
+
+        return (True,'paused %s' % name)
 
     @log_functioncall
     def project_resume(self, args) :
         name = args[0]
 
-        # TODO: check project exists
-        # add project back to queue of eligible projects
+        try :
+            self.projects.resume(name)
 
-        return (False,'not implemented, call \'add\' instead')
+        except ProjectError, pe :
+            self.log.info("project_resume: " + str(pe))
+            return (False, str(pe))
+
+        self.log.debug("resumed %s" % name)
+
+        return (True,'resumed %s' % name)
 
     @log_functioncall
     def project_progress(self, args) :
@@ -181,7 +196,7 @@ class Herzog(DaemonBase) :
         #   get the results file, 
         #   I need get the SCORE file from path,
         #   path needs to resolve from remotepath -> localpath/SCORE-XX_YYY.ALL
-        localpath = p.mapping_get( os.path.dirname(remotepath) )
+        localpath,hostname = p.mapping_get( os.path.dirname(remotepath) )
         self.get_resultfile(resource['hostname'], remotepath, localpath)
         # </hack>
         
@@ -198,19 +213,25 @@ class Herzog(DaemonBase) :
             self.log.debug("%20s  %s" % (str(k), str(v)))
 
         return (True, '')
+
+    # XXX this is a temporary thing, 
+    # just to get a peek at some internal state
+    @log_functioncall
+    def list_current(self) :
+        return self.scheduler.current_project.map
     
     def transfer_datafiles(self, hostname, remotepath, localpath) :
-        command = "scp %s/*DAT %s:%s" % (localpath, hostname, remotepath)
+        command = "scp %s/*DAT ajm@%s:%s" % (localpath, hostname, remotepath)
         if 0 != os.system(command) :
             raise DaemonError("could not tx files with \"%s\"" % command)
     
     def get_resultfile(self, hostname, remotepath, localpath) :
-        command = "scp %s:%s %s" % (hostname, remotepath, localpath)
+        command = "scp ajm@%s:%s %s" % (hostname, remotepath, localpath)
         if 0 != os.system(command) :
             raise DaemonError("could retrieve results file with \"%s\"" % command)
 
     def get_proxy(self,r) :
-        return xmlrpclib.ServerProxy("http://%s:%d" % (r['hostname'], herzogdefaults.DEFAULT_KINSKI_PORT)) 
+        return xmlrpclib.ServerProxy("http://%s:%d" % (r['hostname'], r['portnumber'])) 
         # TODO: put port number in resource object from kinski
 
     def launch_job(self, resource, job) :
@@ -227,7 +248,7 @@ class Herzog(DaemonBase) :
         # nasty hack of a mapping between remote directory and where we want the local 
         # results file to sit and be called...
         p = self.projects.get_project(project)
-        p.mapping_put( tmpdir, job.resultsfile )
+        p.mapping_put( tmpdir, (job.resultsfile,resource['hostname']) )
         self.log.debug("*** mapping %s -> %s" % (tmpdir, job.resultsfile))
         # </hack>
 
@@ -247,18 +268,25 @@ class Herzog(DaemonBase) :
     def rpc_loop(self) :
         try :
             self.server.serve_forever()
+            
         except :
             pass
 
     def main_loop(self) :
         self.scheduler = FIFOScheduler(self.projects, self.resources)
+        keep_job = False
 
         while True :
-            r,j = self.scheduler.get_resource_job()
+            #r,j = self.scheduler.get_resource_job()
+            r = self.scheduler.get_resource()
+            if not keep_job :
+                j = self.scheduler.get_job()
+                keep_job = False
 
             try :
                 self.log.debug("scheduler: %s @ %s" % (str(j), r['hostname']))
                 self.launch_job(r,j)
+                continue
                 
             except DaemonError, de :
                 self.log.error(str(de))
@@ -266,6 +294,8 @@ class Herzog(DaemonBase) :
                 self.log.error(str(fau))
             except socket.gaierror, gai :
                 self.log.error(str(gai))
+
+            keep_job = True
 
 
 def usage() :

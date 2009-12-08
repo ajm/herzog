@@ -8,6 +8,7 @@ import threading
 from glob import glob
 from Queue import Queue
 
+
 class ProjectError(Exception) :
     pass
 
@@ -24,28 +25,25 @@ class Project :
         self.__validate_name(name)
         numfragments = self.__validate_path(path)
 
+        self.name       = name
+        self.path       = path
+        self.program    = program
+
         self.preprocessed_fragments     = 0
         self.processed_fragments        = 0
         self.total_fragments            = numfragments
 
-#        self.processing_complete = False
-    
-        self.name = name
-        self.path = path
-        self.program = program
-        self.start_time = 0
-        self.map = {}
-
         self.fragments = Queue()
-
         self.state = Project.STARTED
 
-    def start(self) :
-        self.start_time = time.time()
-        #if self.preprocessed_fragments == self.total_fragments :
-        #    self.state = Project.RUNNING
-        if self.state == Project.READY :
-            self.state = Project.RUNNING
+        self.start_time = -1
+        self.map = {}
+
+    def started(self) :
+        return self.start_time != -1
+
+    def finished(self) :
+        return self.processed_fragments == self.total_fragments
 
     def __validate_name(self,name) :
         chars = string.letters + string.digits + '-'
@@ -87,10 +85,6 @@ class Project :
     def run_mega2(self, inputfile, path, chromo) :
         command = "cd %s ; mega2 < %s > /dev/null 2> /dev/null ; cd - > /dev/null 2> /dev/null" % (path, inputfile)
         os.system(command)
-#        status,out = commands.getstatusoutput(command)
-#        if status != 0 :
-#            print >> sys.stderr, "mega2 did not run properly : return code %d" % status
-#            sys.exit(-1)
 
         # status from os.system is borked due to multiple commands
         # but i need to do it that way to chdir in a thread...
@@ -112,14 +106,15 @@ class Project :
         if len(missing) != 0 :
             raise ProjectError("%s not found after running mega2" % ','.join(missing))
 
-    def __processing_complete(self) :
-        if self.processed_fragments == 0 :
+    def __preprocessing_complete(self) :
+        if self.state == Project.CANCELLED :
+            return
+        elif not self.started() :
             self.state = Project.READY
-        elif self.processed_fragments == self.total_fragments :
-            self.state = Project.COMPLETED 
+        elif self.finished() :
+            self.state = Project.COMPLETED
         else :
             self.state = Project.RUNNING
-#        self.processing_complete = True
 
     def process_background(self) :
         self.state = Project.PREPROCESSING
@@ -184,7 +179,7 @@ class Project :
                 self.fragments.put( tmp )
                 self.preprocessed_fragments += 1
 
-        self.__processing_complete()
+        self.__preprocessing_complete()
 
     def write_summary(self, fragdir, project, chromosome, fragment) :
         f = open(fragdir + os.sep + "SUMMARY.DAT", 'w')
@@ -200,16 +195,15 @@ class Project :
         return tmp
 
     def next_fragment(self) :
-#        if self.processing_complete and self.fragments.empty() :
         if self.state == Project.RUNNING and self.fragments.empty() :
+            print "\n\npro: running, but no fragments...\n\n"
             return None
 
         if self.state == Project.COMPLETED or self.state == Project.CANCELLED :
+            print "\n\npro: completed or cancelled\n\n"
             return None
 
         fragdir,resultsfile = self.fragments.get()
-
-        #self.mapping_put(fragdir, resultsfile) 
 
         return Job(self.name, fragdir, self.program, resultsfile)
 
@@ -225,20 +219,41 @@ class Project :
         # i don't know if there are going to be an consumer threads - (could send an email!)
 
     def progress(self) : 
-#        return (self.processed_fragments / float(self.total_fragments)) * 100.0
+        prog = (self.processed_fragments / float(self.total_fragments)) * 100.0
+
         if self.state == Project.PREPROCESSING :
-            return ('preprocessing',    (self.preprocessed_fragments / float(self.total_fragments)) * 100.0)
+            return ('preprocessing',  (self.preprocessed_fragments / float(self.total_fragments)) * 100.0)
         elif self.state == Project.READY :
-            return ('ready',            0.0)
+            return ('ready', prog)
         elif self.state == Project.RUNNING :
-            return ('running',          (self.processed_fragments / float(self.total_fragments)) * 100.0)
+            return ('running', prog)
         elif self.state == Project.COMPLETED :
-            return ('complete',         100.0)
+            return ('complete', prog)
+        elif self.state == Project.CANCELLED :
+            return ('cancelled', prog)
         else :
             return ('unknown', -1.0)
 
+    def start(self) :
+        self.start_time = time.time()
+
+        if self.state == Project.READY :
+            self.state = Project.RUNNING
+
     def cancel(self) :
         self.state = Project.CANCELLED
+
+    def pause(self) :
+        if self.state in [Project.READY, Project.RUNNING]:
+            self.state = Project.CANCELLED
+        else :
+            raise ProjectError("only 'ready' or 'running' projects can be paused")
+
+    def resume(self) :
+        if self.state == Project.CANCELLED :
+            self.state = Project.READY
+        else :
+            raise ProjectError("only 'cancelled' projects can be resumed")
         
     def __str__(self) :
         return self.name
@@ -272,6 +287,22 @@ class ProjectPool :
     def remove(self,name) :
         self.projects[name].cancel()
         del self.projects[name]
+
+    def pause(self, name) : 
+        # don't bother removing from the queue, state of project will take care of that...
+        try :
+            p = self.projects[name]
+            p.pause()
+        except KeyError, ke :
+            raise ProjectError("'%s' does not exist" % name)
+
+    def resume(self, name) :
+        try :
+            p = self.projects[name]
+            p.resume()
+            self.project_queue.put(p)
+        except KeyError, ke :
+            raise ProjectError("'%s' does not exist" % name)
 
     def cleanup(self,name) :
         self.remove(name)

@@ -33,7 +33,7 @@ def usage() :
             Give an estimate of how long a project has to complete.
 
         schedule schedule_name
-            Change scheduler behaviour.
+            Change scheduler behaviour. [NOT IMPLEMENTED!]
 
         help
             Print this message.
@@ -83,10 +83,7 @@ def main() :
         print >> sys.stderr, "herzog: %s" % msg
         sys.exit(-1)
 
-    if command == 'add' :
-        print msg
-
-    elif command == 'when' :
+    if command in ['add','when','pause','resume'] :
         print msg
 
     elif command == 'progress' :
@@ -97,7 +94,10 @@ def main() :
                 print "-" * 52
             for k in sorted(msg) :
                 state,progress = msg[k]
-                print s % (k,state,progress)
+                if len(args) == 0 :
+                    print s % (k,state,progress)
+                else :
+                    print ' '.join([k,state,progress])
             if len(args) == 0 :
                 print ""
 

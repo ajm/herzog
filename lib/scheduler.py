@@ -10,12 +10,15 @@ class Scheduler :
         self.log = logger
 
     def get_resource_job(self) :
-        r = self.resources.get_resource()
-        j = self.next_job()
+        r = self.get_resource()
+        j = self.get_job()
 
         return (r,j)
 
-    def next_job(self) :
+    def get_resource(self) :
+        return self.resources.get_resource()
+
+    def get_job(self) :
         raise NotImplemented
 
 class FairScheduler(Scheduler) :
@@ -44,12 +47,14 @@ class FIFOScheduler(Scheduler) :
         self.current_project = self.projects.next_project()
         self.cancelled = False
 
-    def next_job(self) :
-        j = self.current_project.next_fragment()
+    def get_job(self) :
+        j = None
 
-        if (not j) or self.cancelled:
-            self.__next_project()
+        while j == None :
             j = self.current_project.next_fragment()
-        
+
+            if (not j) or self.cancelled :
+                self.__next_project()
+
         return j
 
