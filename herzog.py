@@ -32,12 +32,12 @@ class Herzog(DaemonBase) :
 
     version = 0.1
 
-    def __init__(self, portnumber, baseworkingdir, logdir, verbose=False) :
+    def __init__(self, portnumber, baseworkingdir, logdir, username='herzog', verbose=False) :
         DaemonBase.__init__(self, baseworkingdir, logdir, herzogdefaults.HERZOG_LOG_FILENAME, verbose)
 
         self.resources = ResourcePool()
         self.projects = ProjectPool()
-        #self.scheduler = FIFOScheduler(self.projects, self.resources)
+        self.username = username
         
         url = "http://%s:%d" % (socket.gethostname(), portnumber)
         
@@ -221,12 +221,12 @@ class Herzog(DaemonBase) :
         return self.scheduler.current_project.map
     
     def transfer_datafiles(self, hostname, remotepath, localpath) :
-        command = "scp %s/*DAT ajm@%s:%s" % (localpath, hostname, remotepath)
+        command = "scp %s/*DAT %s@%s:%s" % (localpath, self.username, hostname, remotepath)
         if 0 != os.system(command) :
             raise DaemonError("could not tx files with \"%s\"" % command)
     
     def get_resultfile(self, hostname, remotepath, localpath) :
-        command = "scp ajm@%s:%s %s" % (hostname, remotepath, localpath)
+        command = "scp %s@%s:%s %s" % (self.username, hostname, remotepath, localpath)
         if 0 != os.system(command) :
             raise DaemonError("could retrieve results file with \"%s\"" % command)
 
@@ -306,10 +306,12 @@ def usage() :
     -w  working directory   (default: %s)
     -l  log directory       (default: %s)
     -p  port number         (default: %d)
+    -u  user name           (default: %s)
 """ %  (    sys.argv[0],                        \
             herzogdefaults.DEFAULT_WORKING_DIR, \
             herzogdefaults.DEFAULT_LOG_DIR,     \
-            herzogdefaults.DEFAULT_HERZOG_PORT)
+            herzogdefaults.DEFAULT_HERZOG_PORT, \
+            herzogdefaults.DEFAULT_USERNAME)
 
 def error_msg(s) :
     print >> sys.stderr, "%s: %s" % (sys.argv[0], s)
@@ -319,7 +321,7 @@ def handleargs() :
     global options
 
     try :
-        opts,args = getopt.getopt(sys.argv[1:], "vhp:w:l:")
+        opts,args = getopt.getopt(sys.argv[1:], "vhp:w:l:u:")
 
     except getopt.GetoptError, err:
         print >> sys.stderr, str(err)
@@ -349,6 +351,8 @@ def handleargs() :
                 error_msg("%s does not exist" % a)
 
             options['logdirectory'] = a
+        elif o == "-u" :
+            options['username'] = a
 
     if options['verbose'] :
         for k,v in options.items() :
@@ -362,6 +366,7 @@ def main() :
     options['portnumber']       = herzogdefaults.DEFAULT_HERZOG_PORT
     options['workingdirectory'] = herzogdefaults.DEFAULT_WORKING_DIR
     options['logdirectory']     = herzogdefaults.DEFAULT_LOG_DIR
+    options['username']         = herzogdefaults.DEFAULT_USERNAME
 
     handleargs()
 
@@ -369,6 +374,7 @@ def main() :
         h = Herzog( options['portnumber'], \
                     options['workingdirectory'], \
                     options['logdirectory'], \
+                    username=options['username'], \
                     verbose=options['verbose'])
         h.go()
 
