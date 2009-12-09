@@ -1,4 +1,4 @@
-import os, glob
+import os, glob, re
 import plugins
 from plugins import KinskiPlugin, PluginError
 
@@ -20,7 +20,7 @@ class simwalk2(KinskiPlugin) :
 
         os.system("cd %s ; simwalk2 ; cd - > /dev/null" % (path))
         
-        score_files = filter(lambda x : os.path.basename(x).startswith("SCORE"), glob.glob(path + os.sep + "*"))
+        score_files = filter(lambda x : re.match("^SCORE.*\.ALL$", os.path.basename(x)) , glob.glob(path + os.sep + "*"))
         
         if len(score_files) == 0 :
             raise PluginError("no results file")
