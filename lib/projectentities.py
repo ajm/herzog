@@ -108,6 +108,7 @@ class Project :
             self.plugin.process_all_input(self.name, self.path, self.fragments, \
                 self.increment_preprocessed, self.increment_processed, self.cancelled)
             self.__preprocessing_complete()
+
         except plugins.PluginError, pe :
             self.log.error(str(pe))
             self.state = Project.ERROR
@@ -129,9 +130,9 @@ class Project :
             #self.log.debug("project: completed or cancelled")
             return None
 
-        fragdir,resultsfile = self.fragments.get()
+        input,output = self.fragments.get()
 
-        return Job(self.name, fragdir, self.program, resultsfile)
+        return Job(self.name, self.program, input, output)
 
     def finished(self) :
         return self.processed_fragments == self.total_fragments
@@ -187,14 +188,14 @@ class Project :
         return self.name
 
 class Job :
-    def __init__(self, project, path, program, resultsfile) :
+    def __init__(self, project, program, inputfiles, outputfile) : 
         self.project = project
-        self.path = path
         self.program = program
-        self.resultsfile = resultsfile
+        self.input_files  = inputfiles
+        self.output_file = outputfile
 
     def __str__(self) :
-        return "%s : %s : %s" % (self.project, self.program, self.path)
+        return "%s,%s: %s -> %s" % (self.project, self.program, ','.join(self.input_files), self.output_file)
 
 class ProjectPool : 
     def __init__(self) :

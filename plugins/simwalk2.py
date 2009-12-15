@@ -5,6 +5,21 @@ import shutil
 import plugins
 from plugins import KinskiPlugin, PluginError
 
+# input:
+#   PEDIGREE.DAT
+#   LOCUS.DAT
+#   PEN.DAT
+#   BATCH2.DAT
+#   MAP.DAT
+#
+# output:
+#   SCORE-01.ALL
+# 
+# run :
+#   cd c01
+#   simwalk2
+#
+
 class simwalk2(KinskiPlugin) :
     def __init__(self) :
         pass
@@ -142,8 +157,12 @@ class simwalk2(KinskiPlugin) :
                 # write summary
                 self.__write_summary(fragdir, projectname, "simwalk2", chromo, fragid) 
 
-                tmp = (fragdir, dir + os.sep + ("SCORE-%s_%s.ALL" % (chromo,fragid))) 
-                # TODO define this as a class so it is unambiguous
+                # make job object, TODO define this as a class so it is unambiguous...
+                input  = map(lambda x : fragdir + os.sep + x, \
+                        ['PEDIGREE.DAT','LOCUS.DAT','PEN.DAT','BATCH2.DAT','MAP.DAT','SUMMARY.DAT'])
+                output = dir + os.sep + ("SCORE-%s_%s.ALL" % (chromo,fragid))
+                tmp = (input,output)
+
                 queue.put( tmp )
                 increment_preprocessed_func()
 

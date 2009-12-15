@@ -225,10 +225,11 @@ class Herzog(DaemonBase) :
     def list_current(self) :
         return self.scheduler.current_project.map
     
-    def transfer_datafiles(self, hostname, remotepath, localpath) :
-        command = "scp %s/*DAT %s@%s:%s" % (localpath, self.username, hostname, remotepath)
-        if 0 != os.system(command) :
-            raise DaemonError("could not tx files with \"%s\"" % command)
+    def transfer_datafiles(self, hostname, remotepath, inputfiles) :
+        for localpath in inputfiles :
+            command = "scp %s %s@%s:%s" % (localpath, self.username, hostname, remotepath)
+            if 0 != os.system(command) :
+                raise DaemonError("could not tx files with \"%s\"" % command)
     
     def get_resultfile(self, hostname, remotepath, localpath) :
         command = "scp %s@%s:%s %s" % (self.username, hostname, remotepath, localpath)
@@ -242,8 +243,9 @@ class Herzog(DaemonBase) :
     def launch_job(self, resource, job) :
         proxy       = self.get_proxy(resource)
         project     = job.project
-        path        = job.path
         program     = job.program
+        input       = job.input_files
+        output      = job.output_file
         
         successful,tmpdir = proxy.fragment_prep( project )
         if not successful :
@@ -253,11 +255,11 @@ class Herzog(DaemonBase) :
         # nasty hack of a mapping between remote directory and where we want the local 
         # results file to sit and be called...
         p = self.projects.get_project(project)
-        p.mapping_put( tmpdir, (job.resultsfile,resource['hostname']) )
-        self.log.debug("*** mapping %s -> %s" % (tmpdir, job.resultsfile))
+        p.mapping_put( tmpdir, (output, resource['hostname']) )
+        self.log.debug("*** mapping %s -> %s" % (tmpdir, output))
         # </hack>
 
-        self.transfer_datafiles(resource['hostname'], tmpdir, path)
+        self.transfer_datafiles(resource['hostname'], tmpdir, input)
 
         successful,msg = proxy.fragment_start( tmpdir, program, project )
         if not successful :
