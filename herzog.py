@@ -40,8 +40,10 @@ class Herzog(DaemonBase) :
         self.username = username
         
         url = "http://%s:%d" % (socket.gethostname(), portnumber)
+        hn = socket.gethostname()
+        hn = 'euclid.kleta-lab'
         
-        self.server = SimpleXMLRPCServer((socket.gethostname(), portnumber))
+        self.server = SimpleXMLRPCServer((hn, portnumber))
         
         self.server.register_function(self.register_resources,  'register_resources')
         self.server.register_function(self.fragment_complete,   'fragment_complete')
@@ -390,6 +392,6 @@ def main() :
 
 if __name__ == '__main__' :
     if os.name != 'posix' :
-        print >> sys.stderr, "kinski is only supported on posix systems at the moment"
+        print >> sys.stderr, "%s is only supported on posix systems at the moment" % sys.argv[0]
     main()
 

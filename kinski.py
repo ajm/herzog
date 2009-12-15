@@ -270,7 +270,7 @@ def main() :
 
 if __name__ == '__main__' :
     if os.name != 'posix' :
-        print >> sys.stderr, "kinski is only supported on posix systems at the moment"
+        print >> sys.stderr, "%s is only supported on posix systems at the moment" % sys.argv[0]
 
     main()
 
