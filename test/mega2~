@@ -1,5 +1,0 @@
-#!/bin/bash
-
-sleep 1
-touch PEDIGREE.DAT LOCUS.DAT PEN.DAT BATCH2.DAT MAP.DAT
-
