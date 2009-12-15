@@ -5,6 +5,7 @@ import time
 import string
 import shutil
 import threading
+import plugins
 from glob import glob
 from Queue import Queue
 
@@ -20,14 +21,16 @@ class Project :
     RUNNING         = 3     
     COMPLETED       = 4
     CANCELLED       = 5
+    ERROR           = 6
 
-    def __init__(self, name, path, program) :
+    def __init__(self, name, path, program, logger) :
         self.__validate_name(name)
         numfragments = self.__validate_path(path)
 
         self.name       = name
         self.path       = path
         self.program    = program
+        self.log        = logger
 
         self.preprocessed_fragments     = 0
         self.processed_fragments        = 0
@@ -39,11 +42,12 @@ class Project :
         self.start_time = -1
         self.map = {}
 
-    def started(self) :
-        return self.start_time != -1
+        # XXX TODO : find plugin for program + add throw exception if not found...
+        try :
+            self.plugin = plugins.get_plugin(self.program)
 
-    def finished(self) :
-        return self.processed_fragments == self.total_fragments
+        except plugins.PluginError, pe :
+            raise ProjectError(str(pe))
 
     def __validate_name(self,name) :
         chars = string.letters + string.digits + '-'
@@ -69,42 +73,20 @@ class Project :
 
         return number_fragments
 
-    def write_mega2_input(self, path) :
-        abspath = path + os.sep + "mega2_in.tmp"
-        try :
-            f = open(abspath, 'w')
+    def started(self) :
+        return self.start_time != -1
 
-        except IOError, ioe:
-            raise ProjectError("could not open %s" % abspath) 
+    def cancelled(self) :
+        return self.state == Project.CANCELLED
 
-        print >> f, "1\n00\n0\n1\n2\n0\n0\n0" # '00' is the file extention
-        f.close()
+    def finished(self) :
+        return self.processed_fragments == self.total_fragments
 
-        return abspath
+    def increment_preprocessed(self) :
+        self.preprocessed_fragments += 1
 
-    def run_mega2(self, inputfile, path, chromo) :
-        command = "cd %s ; mega2 < %s > /dev/null 2> /dev/null ; cd - > /dev/null 2> /dev/null" % (path, inputfile)
-        os.system(command)
-
-        # status from os.system is borked due to multiple commands
-        # but i need to do it that way to chdir in a thread...
-        # check output file existance instead...
-        missing = []
-        files = {
-            'sw2_pedigree.%s' % chromo : 'PEDIGREE.DAT',
-            'sw2_locus.%s' % chromo    : 'LOCUS.DAT', 
-            'sw2_pen.%s' % chromo      : 'PEN.DAT',
-            'sw2_batch.%s' % chromo    : 'BATCH2.DAT',
-            'sw2_map.%s' % chromo      : 'MAP.DAT'
-        }
-        for oldfilename,newfilename in files.items() :
-            if not os.path.exists(path + os.sep + oldfilename) :
-                missing.append(oldfilename)
-            else :
-                os.rename(path + os.sep + oldfilename, path + os.sep + newfilename)
-
-        if len(missing) != 0 :
-            raise ProjectError("%s not found after running mega2" % ','.join(missing))
+    def increment_processed(self) :
+        self.processed_fragments += 1
 
     def __preprocessing_complete(self) :
         if self.state == Project.CANCELLED :
@@ -121,70 +103,14 @@ class Project :
         t = threading.Thread(target=self.process)
         t.start()
 
-    # TODO this must go into its own plugin or else in the kinski simwalk plugin...
     def process(self) :
-        dir_re   = re.compile(".*c(\d+)$")
-        input_re = re.compile("^datain_(\d+)\..*")
-
-        listing = filter(lambda x : os.path.isdir(x) and dir_re.match(x), glob(self.path + os.sep + "*"))
-        mega2_input = self.write_mega2_input(self.path)
-
-        for dir in listing :
-            chromo = dir_re.match(dir).group(1)
-            inputfiles = glob(dir + os.sep + 'datain_*')
-
-            for f in inputfiles :
-
-                if self.state == Project.CANCELLED :
-                    return
-
-                dirname,filename = os.path.split(f)
-                m = input_re.match(filename)
-                if not m :
-                    continue
-                fragid = m.group(1)
-
-                if os.path.exists(dirname + os.sep + ("SCORE-%s_%s.ALL" % (chromo, fragid))) :
-                    self.processed_fragments += 1
-                    continue
-
-                fragdir = dirname + os.sep + fragid
-                if os.path.exists(fragdir) :
-                    try :
-                        shutil.rmtree(fragdir)
-
-                    except :
-                        pass
-                try :
-                    os.mkdir(fragdir)
-
-                except OSError, ose :
-                    self.log.error(str(ose))
-                    continue
-                
-                shutil.copy(dir + os.sep + ("datain_%s.%s" % (fragid,chromo)),  fragdir + os.sep + "datain.00")
-                shutil.copy(dir + os.sep + ("pedin_%s.%s" % (fragid,chromo)),   fragdir + os.sep + "pedin.00")
-                shutil.copy(dir + os.sep + ("map_%s.%s" % (fragid,chromo)),     fragdir + os.sep + "map.00")
-                
-                try :                
-                    self.run_mega2(mega2_input, fragdir, chromo)
-                except ProjectError, pe :
-                    # TODO report! or log in some way
-                    continue
-
-                self.write_summary(fragdir, self.name, chromo, fragid) # TODO: is this cool?
-
-                tmp = (fragdir, dir + os.sep + ("SCORE-%s_%s.ALL" % (chromo,fragid)))
-                # TODO write file with project name, chromosome, fragment id, program,
-                self.fragments.put( tmp )
-                self.preprocessed_fragments += 1
-
-        self.__preprocessing_complete()
-
-    def write_summary(self, fragdir, project, chromosome, fragment) :
-        f = open(fragdir + os.sep + "SUMMARY.DAT", 'w')
-        print >> f, "%s %s %s" % (project, chromosome, fragment)
-        f.close()
+        try :
+            self.plugin.process_all_input(self.name, self.path, self.fragments, \
+                self.increment_preprocessed, self.increment_processed, self.cancelled)
+            self.__preprocessing_complete()
+        except plugins.PluginError, pe :
+            self.log.error(str(pe))
+            self.state = Project.ERROR
 
     def mapping_put(self, x, y) :
         self.map[x] = y
@@ -196,11 +122,11 @@ class Project :
 
     def next_fragment(self) :
         if self.state == Project.RUNNING and self.fragments.empty() :
-            print "\n\npro: running, but no fragments...\n\n"
+            #self.log.debug("project: running, but no fragments...")
             return None
 
         if self.state == Project.COMPLETED or self.state == Project.CANCELLED :
-            print "\n\npro: completed or cancelled\n\n"
+            #self.log.debug("project: completed or cancelled")
             return None
 
         fragdir,resultsfile = self.fragments.get()
@@ -231,6 +157,8 @@ class Project :
             return ('complete', prog)
         elif self.state == Project.CANCELLED :
             return ('cancelled', prog)
+        elif self.state == Project.ERROR :
+            return ('error', -1.0)
         else :
             return ('unknown', -1.0)
 

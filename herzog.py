@@ -15,6 +15,7 @@ from lib.daemonbase import *
 from lib.sysinfo    import Resource
 from lib.scheduler  import FIFOScheduler
 from etc            import herzogdefaults
+import plugins
 
 
 options = {}
@@ -38,10 +39,12 @@ class Herzog(DaemonBase) :
         self.resources = ResourcePool()
         self.projects = ProjectPool()
         self.username = username
+
+        plugins.init_plugins("plugins")
         
         url = "http://%s:%d" % (socket.gethostname(), portnumber)
         hn = socket.gethostname()
-        hn = 'euclid.kleta-lab'
+#        hn = 'euclid.kleta-lab'
         
         self.server = SimpleXMLRPCServer((hn, portnumber))
         
@@ -70,7 +73,7 @@ class Herzog(DaemonBase) :
             return (False, msg)
 
         try :
-            p = Project(name, path, program)
+            p = Project(name, path, program, self.log)
 
         except ProjectError, pe:
             self.log.info(str(pe))

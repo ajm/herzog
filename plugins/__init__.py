@@ -13,6 +13,10 @@ class KinskiPlugin(object):
     def kill(self) :
         raise NotImplemented
 
+    def process_all_input(self, projectname, path, queue, \
+            increment_preprocessed_func, increment_processed_func, cancelled_func) :
+        raise NotImplemented
+
 class PluginError(Exception) :
     pass
 
