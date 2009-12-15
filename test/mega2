@@ -1,0 +1,9 @@
+#!/bin/bash
+
+sleep 1
+touch PEDIGREE.DAT 
+touch LOCUS.DAT 
+touch PEN.DAT 
+touch BATCH2.DAT 
+touch MAP.DAT
+

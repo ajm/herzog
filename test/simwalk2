@@ -1,0 +1,6 @@
+#!/bin/bash
+
+sleep 2
+touch SCORE-00.ALL 
+# 00 should be chromosome number with leading zero if single digit
+
