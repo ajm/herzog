@@ -43,8 +43,8 @@ class Herzog(DaemonBase) :
         plugins.init_plugins("plugins")
         
         url = "http://%s:%d" % (socket.gethostname(), portnumber)
-        hn = socket.gethostname()
-#        hn = 'euclid.kleta-lab'
+        #hn = socket.gethostname()
+        hn = socket.getfqdn()
         
         self.server = SimpleXMLRPCServer((hn, portnumber))
         

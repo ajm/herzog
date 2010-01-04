@@ -38,13 +38,15 @@ class genehunter(KinskiPlugin) :
         pass
 
     def run(self, path) :
-        setupfiles = filter(lambda x : (os.path.split(x)).startswith('setup'), glob.glob(path + os.sep + '*'))
+        #setupfiles = filter(lambda x : os.path.split(x)[1].startswith('setup'), glob.glob(path + os.sep + '*'))
+        setupfiles = glob.glob(path + os.sep + 'setup*')
         if len(setupfiles) > 1 :
             raise PluginError("more than one setup file, I don't know which to use: %s" % ','.join(setupfiles))
 
         os.system("cd %s ; ghm < %s > /dev/null 2> /dev/null ; cd - > /dev/null 2> /dev/null" % (path, setupfiles[0]))
 
-        resultsfiles = filter(lambda x : (os.path.split(x)).startswith('gh_'), glob.glob(path + os.sep + '*'))
+        #resultsfiles = filter(lambda x : os.path.split(x)[1].startswith('gh_'), glob.glob(path + os.sep + '*'))
+        resultsfiles = glob.glob(path + os.sep + 'gh_*')
 
         if len(resultsfiles) == 0 :
             raise PluginError("no results file")
@@ -84,10 +86,11 @@ class genehunter(KinskiPlugin) :
                     increment_processed_func()
                     continue
 
-                input  = map(lambda x : fragdir + os.sep + (x % (fragid,chromo)), \
+                input  = map(lambda x : dirname + os.sep + (x % (fragid,chromo)), \
                         ['datain_%s.%s','map_%s.%s','pedin_%s.%s','setup_%s.%s'])
-                output = dir + os.sep + ("gh_%s.out" % fragid)
+                output = dirname + os.sep + ("gh_%s.out" % fragid)
                 tmp = (input,output)
 
                 queue.put( tmp )
                 increment_preprocessed_func()
+
