@@ -148,13 +148,18 @@ class Kinski(DaemonBase) :
             time.sleep(60)
 
     def __signalmaster(self) :
-        try :
-            p = xmlrpclib.ServerProxy(self.masterurl)
-            p.register_resources(self.resource)
+        while True :
+            try :
+                p = xmlrpclib.ServerProxy(self.masterurl)
+                p.register_resources(self.resource)
+                self.log.debug("registered with master node")
+                return
 
-        except :
-            self.log.critical("could not contact master node at %s" % self.masterurl)
-            sys.exit(-1)
+            except :
+                self.log.critical("could not contact master node at %s" % self.masterurl)
+                #sys.exit(-1)
+                time.sleep(10)
+                continue
 
     def go(self) :
         self.__signalmaster() # TODO
