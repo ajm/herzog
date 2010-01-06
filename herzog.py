@@ -228,8 +228,19 @@ class Herzog(DaemonBase) :
     def transfer_datafiles(self, hostname, remotepath, inputfiles) :
         for localpath in inputfiles :
             command = "scp %s %s@%s:%s" % (localpath, self.username, hostname, remotepath)
-            if 0 != os.system(command) :
-                raise DaemonError("could not tx files with \"%s\"" % command)
+            success = False
+
+            for i in range(3) :
+                if 0 == os.system(command) :
+                    success = True
+                    break
+                else :
+                    self.log.error("%s failed, retrying..." % command)
+
+            if success :
+                continue
+
+            raise DaemonError("could not tx files with \"%s\"" % command)
     
     def get_resultfile(self, hostname, remotepath, localpath) :
         command = "scp %s@%s:%s %s" % (self.username, hostname, remotepath, localpath)
@@ -251,19 +262,20 @@ class Herzog(DaemonBase) :
         if not successful :
             raise DaemonError(tmpdir)
 
-        # <hack>
-        # nasty hack of a mapping between remote directory and where we want the local 
-        # results file to sit and be called...
-        p = self.projects.get_project(project)
-        p.mapping_put( tmpdir, (output, resource['hostname']) )
-        self.log.debug("*** mapping %s -> %s" % (tmpdir, output))
-        # </hack>
-
         self.transfer_datafiles(resource['hostname'], tmpdir, input)
 
         successful,msg = proxy.fragment_start( tmpdir, program, project )
         if not successful :
             raise DaemonError(msg)
+
+        # MOVED TO AFTER FILES TX-ED & WORK STARTED...
+        # <hack>
+        # nasty hack of a mapping between remote directory and where we want the local 
+        # results file to sit and be called...
+        p = self.projects.get_project(project)
+        p.mapping_put( tmpdir, (output, resource['hostname']) )
+        #self.log.debug("*** mapping %s -> %s" % (tmpdir, output))
+        # </hack>
         
     def go(self) :
         self.scheduler_thread = threading.Thread(target=self.main_loop)
@@ -288,6 +300,7 @@ class Herzog(DaemonBase) :
             r = self.scheduler.get_resource()
             if not keep_job :
                 j = self.scheduler.get_job()
+            else :
                 keep_job = False
 
             try :
