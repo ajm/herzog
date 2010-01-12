@@ -51,7 +51,7 @@ class genehunter(KinskiPlugin) :
         if len(resultsfiles) == 0 :
             raise PluginError("no results file")
         elif len(resultsfiles) == 1 :
-            return resultsfiles[0]
+            return resultsfiles
         else :
             raise PluginError("ambiguous results file, found %s" % ','.join(resultsfiles))
 

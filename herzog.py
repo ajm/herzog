@@ -201,8 +201,14 @@ class Herzog(DaemonBase) :
         #   get the results file, 
         #   I need get the SCORE file from path,
         #   path needs to resolve from remotepath -> localpath/SCORE-XX_YYY.ALL
-        localpath,hostname = p.mapping_get( os.path.dirname(remotepath) )
-        self.get_resultfile(resource['hostname'], remotepath, localpath)
+#        if type(remotepath) != type([]) :
+#            localpath,hostname = p.mapping_get( os.path.dirname(remotepath) )
+#            self.get_resultfile(resource['hostname'], remotepath, localpath)
+#        else :
+#            pass
+        localpath,hostname = p.mapping_get( os.path.dirname(remotepath[0]) )
+        for path in remotepath :
+            self.get_resultfile(resource['hostname'], path, localpath)
         # </hack>
         
         p.fragment_complete()
@@ -244,7 +250,16 @@ class Herzog(DaemonBase) :
     
     def get_resultfile(self, hostname, remotepath, localpath) :
         command = "scp %s@%s:%s %s" % (self.username, hostname, remotepath, localpath)
-        if 0 != os.system(command) :
+        success = False
+
+        for i in range(3) :
+            if 0 == os.system(command) :
+                success = True
+                break
+            else :
+                self.log.error("%s failed, retrying..." % command)
+
+        if not success :
             raise DaemonError("could retrieve results file with \"%s\"" % command)
 
     def get_proxy(self,r) :
