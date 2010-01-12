@@ -19,7 +19,7 @@ from plugins import KinskiPlugin, PluginError
 #   allegro allegro.in
 #
 
-class genehunter(KinskiPlugin) :
+class allegro(KinskiPlugin) :
 
     def __init__(self) :
         pass
@@ -59,12 +59,12 @@ class genehunter(KinskiPlugin) :
     def kill(self) :
         pass
 
-    def write_allegro_input(directory, chr) :
+    def write_allegro_input(self, directory, chr) :
         f = open(directory + os.sep + 'allegro.in', 'w')
         print >> f, "PREFILE pedin.%s" % chr
         print >> f, "DATFILE datain.%s" % chr
         print >> f, "MODEL mpt par het param_mpt.%s" % chr
-        print >> f, "MODEL mpt lin all equal linall_mpt.%s"
+        print >> f, "MODEL mpt lin all equal linall_mpt.%s" % chr
         print >> f, "HAPLOTYPE"
         print >> f, "MAXMEMORY 1200"
         f.close()
@@ -86,13 +86,13 @@ class genehunter(KinskiPlugin) :
                     return
 
                 dirname,filename = os.path.split(f)
-                write_allegro_input(dirname, chromo)
+                self.write_allegro_input(dirname, chromo)
                 
                 if len(glob.glob(dirname + os.sep + "*mpt*")) != 0 :
                     increment_processed_func()
                     continue
 
-                input  = map(lambda x : dirname + os.sep + (x % (chromo)), \
+                input  = [dirname + os.sep + 'allegro.in'] + map(lambda x : dirname + os.sep + (x % (chromo)), \
                         ['datain.%s','map.%s','pedin.%s'])
                 output = dirname
                 tmp = (input,output)

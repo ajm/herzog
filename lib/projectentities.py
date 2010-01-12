@@ -65,7 +65,7 @@ class Project :
         number_fragments = 0
 
         for dir in listing :
-            inputfiles = glob(dir + os.sep + 'datain_*')
+            inputfiles = glob(dir + os.sep + 'datain*')
             number_fragments += len(inputfiles)
 
         if number_chromosomes == 0 or number_fragments == 0 :
