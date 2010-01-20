@@ -42,7 +42,7 @@ class Kinski(DaemonBase) :
     
     version = 0.1
 
-    def __init__(self, portnumber, baseworkingdir, logdir, masterhostname, masterportnumber, plugindir='plugins', verbose=False) :
+    def __init__(self, portnumber, baseworkingdir, logdir, masterhostname, masterportnumber, plugindir='plugins', cores=None, verbose=False) :
         DaemonBase.__init__(self, baseworkingdir, logdir, herzogdefaults.KINSKI_LOG_FILENAME, verbose)
 
         self.resource = Resource()
@@ -51,6 +51,8 @@ class Kinski(DaemonBase) :
         random.seed()
 
         self.resource.portnumber = portnumber # <hack>
+        if cores != None :
+            self.resource.cpucores = cores
 
         plugins.init_plugins(plugindir)
         
@@ -187,6 +189,7 @@ def usage() :
     -p  port number         (default: %d)
     -m  master host name    (default: %s)
     -x  master port number  (default: %d)
+    -n  cpu cores available (default: all)
 """ %  (    sys.argv[0],                        \
             herzogdefaults.DEFAULT_WORKING_DIR, \
             herzogdefaults.DEFAULT_LOG_DIR,     \
@@ -202,7 +205,7 @@ def handleargs() :
     global options
     
     try :
-        opts,args = getopt.getopt(sys.argv[1:], "vhp:w:l:m:x:")
+        opts,args = getopt.getopt(sys.argv[1:], "vhp:w:l:m:x:n:")
 
     except getopt.GetoptError, err:
         print >> sys.stderr, str(err)
@@ -241,6 +244,13 @@ def handleargs() :
                 error_msg("invalid port number: " + str(e))
 
             options['masterportnumber'] = portnum
+        elif o == "-n" :
+            try :
+                cores = int(a)
+            except ValueError, e :
+                error_msg("non-integer number of cores specified: " + str(e))
+
+            options['cores'] = cores
 
     if options['verbose'] :
         for k,v in options.items() :
@@ -256,6 +266,7 @@ def main() :
     options['logdirectory']     = herzogdefaults.DEFAULT_LOG_DIR
     options['master']           = herzogdefaults.DEFAULT_HERZOG_HOST
     options['masterportnumber'] = herzogdefaults.DEFAULT_HERZOG_PORT
+    options['cores']            = None
 
     handleargs()
 
@@ -265,6 +276,7 @@ def main() :
                     options['logdirectory'], \
                     options['master'], \
                     options['masterportnumber'], \
+                    cores=options['cores'], \
                     verbose=options['verbose'])
         k.go()
 
