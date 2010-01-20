@@ -41,6 +41,10 @@ class allegro(KinskiPlugin) :
 
         os.system("cd %s ; allegro allegro.in > /dev/null 2> /dev/null ; cd - > /dev/null 2> /dev/null" % path)
 
+        # delete any tmp directories as these can get pretty big
+        for f in filter(os.path.isdir, glob.glob(path + os.sep + '*')) :
+            shutil.rmtree(f, ignore_errors=True)
+
         resultsfiles = glob.glob(path + os.sep + '*.out')
 
         f = open(path + os.sep + 'allegro.in')
@@ -66,7 +70,7 @@ class allegro(KinskiPlugin) :
         print >> f, "MODEL mpt par het param_mpt.%s" % chr
         print >> f, "MODEL mpt lin all equal linall_mpt.%s" % chr
         print >> f, "HAPLOTYPE"
-        print >> f, "MAXMEMORY 1200"
+        print >> f, "MAXMEMORY 1024"
         f.close()
 
     def process_all_input(self, projectname, path, queue, \
