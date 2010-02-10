@@ -195,7 +195,13 @@ class Herzog(DaemonBase) :
     @log_functioncall
     def fragment_complete(self, resource, project, remotepath) :
         self.resources.add_core_resource(resource['hostname'])
-        p = self.projects.get_project(project)
+        try :
+            p = self.projects.get_project(project)
+
+        except ProjectError, pe :
+            # project might have been deleted
+            self.log.info("\tproject %s does not exist..." % project)
+            return (False, 'project %s does not exist...' % project)
 
         # <hack>
         #   get the results file, 
