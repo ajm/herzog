@@ -239,7 +239,7 @@ class Herzog(DaemonBase) :
     
     def transfer_datafiles(self, hostname, remotepath, inputfiles) :
         for localpath in inputfiles :
-            command = "scp %s %s@%s:%s" % (localpath, self.username, hostname, remotepath)
+            command = "scp -o \"ConnectTimeout 3\" %s %s@%s:%s" % (localpath, self.username, hostname, remotepath)
             success = False
 
             for i in range(3) :
@@ -255,7 +255,7 @@ class Herzog(DaemonBase) :
             raise DaemonError("could not tx files with \"%s\"" % command)
     
     def get_resultfile(self, hostname, remotepath, localpath) :
-        command = "scp %s@%s:%s %s" % (self.username, hostname, remotepath, localpath)
+        command = "scp -o \"ConnectTimeout 3\" %s@%s:%s %s" % (self.username, hostname, remotepath, localpath)
         success = False
 
         for i in range(3) :
